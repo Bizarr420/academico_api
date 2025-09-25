@@ -1,21 +1,47 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordRequestForm
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
 from app.core.security import verify_password, create_access_token, hash_password
-from app.schemas.usuarios import Token, UsuarioCreate
+from app.schemas.usuarios import LoginResponse, UsuarioCreate, UsuarioOut
 from app.db.models import Usuario, Persona, EstadoUsuarioEnum
+from pydantic import BaseModel, Field, ValidationError
 import traceback
 import sys
 
 router = APIRouter()
 
-@router.post("/login", response_model=Token)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    u = db.query(Usuario).filter(Usuario.username == form.username).first()
-    if not u or not verify_password(form.password, u.password_hash):
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@router.post("/login", response_model=LoginResponse)
+async def login(request: Request, db: Session = Depends(get_db)):
+    content_type = request.headers.get("content-type", "")
+
+    if content_type.startswith("application/json"):
+        try:
+            payload = await request.json()
+        except Exception as exc:  # pragma: no cover - body parsing guard
+            raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos") from exc
+        try:
+            credentials = LoginRequest.model_validate(payload)
+        except ValidationError as exc:
+            raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos") from exc
+    else:
+        form = await request.form()
+        username = form.get("username")
+        password = form.get("password")
+        if not username or not password:
+            raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos")
+        credentials = LoginRequest(username=username, password=password)
+
+    u = db.query(Usuario).filter(Usuario.username == credentials.username).first()
+    if not u or not verify_password(credentials.password, u.password_hash):
         raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos")
-    return Token(access_token=create_access_token(subject=u.username))
+    token = create_access_token(subject=u.username)
+    user_payload = UsuarioOut.model_validate(u, from_attributes=True)
+    return LoginResponse(access_token=token, user=user_payload)
 
 @router.post("/register", response_model=dict)
 def register(data: UsuarioCreate, db: Session = Depends(get_db)):
@@ -44,25 +70,14 @@ def register(data: UsuarioCreate, db: Session = Depends(get_db)):
         print("Error creando evaluación:", e)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"error interno")
-from fastapi import Depends
-from app.api.deps import get_current_user
-from app.db.models import Usuario
-from pydantic import BaseModel, Field
-from app.core.security import verify_password, hash_password
 
 class PasswordChangeIn(BaseModel):
     old_password: str = Field(min_length=6)
     new_password: str = Field(min_length=6)
 
-@router.get("/me")
+@router.get("/me", response_model=UsuarioOut)
 def me(current_user: Usuario = Depends(get_current_user)):
-    return {
-        "id": current_user.id,
-        "username": current_user.username,
-        "persona_id": current_user.persona_id,
-        "rol_id": current_user.rol_id,
-        "estado": current_user.estado,
-    }
+    return UsuarioOut.model_validate(current_user, from_attributes=True)
 
 @router.post("/change-password")
 def change_password(data: PasswordChangeIn, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
