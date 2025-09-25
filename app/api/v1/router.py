@@ -3,7 +3,21 @@ from fastapi import APIRouter
 # IMPORTA EXPLÍCITAMENTE el router de materias con alias
 from .materias import router as materias_router
 
-from . import auth, personas, estudiantes, notas, evaluaciones, cursos, paralelos, asistencia, asignaciones, matriculas, reportes, alertas
+from . import (
+    alertas,
+    asistencia,
+    asignaciones,
+    auth,
+    cursos,
+    evaluaciones,
+    estudiantes,
+    frontend,
+    matriculas,
+    notas,
+    paralelos,
+    personas,
+    reportes,
+)
 
 api_router = APIRouter()
 api_router.include_router(auth.router,         prefix="/auth",         tags=["auth"])
@@ -22,3 +36,4 @@ api_router.include_router(asignaciones.router, prefix="/asignaciones", tags=["as
 api_router.include_router(matriculas.router,   prefix="/matriculas",   tags=["matriculas"])
 api_router.include_router(reportes.router,     prefix="/reportes",     tags=["reportes"])
 api_router.include_router(alertas.router, prefix="/alertas", tags=["alertas"])
+api_router.include_router(frontend.router)
