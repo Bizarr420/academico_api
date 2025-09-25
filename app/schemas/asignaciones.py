@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field
-from pydantic import BaseModel, ConfigDict, Field  # 👈 añade esto
+"""Pydantic schemas for asignaciones (teaching assignments)."""
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class AsignacionBase(BaseModel):
     docente_id: int
@@ -8,10 +10,12 @@ class AsignacionBase(BaseModel):
     paralelo_id: int
     gestion: str = Field(..., max_length=10)
 
+
 class AsignacionCreate(AsignacionBase):
     pass
 
+
 class AsignacionOut(AsignacionBase):
     id: int
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
