@@ -1,48 +1,53 @@
-from sqlalchemy import text
-from app.db.base import Base
-from app.db.session import engine
-import app.db.models
-from fastapi import FastAPI
-from app.api.v1.router import api_router
-from app.db import models
-from app.db import models  # 👈 importa modelos, sin crear un nombre 'app' paquete aquí
+"""Application entry-point for Académico API."""
 
 from fastapi import FastAPI
-from sqlalchemy import text
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.api.v1.router import api_router
+from app.db.models import Rol
 from app.db.session import engine
-from app.db.base import Base
-from app.db import models  # importa modelos sin crear el nombre 'app' en este módulo
+
 
 app = FastAPI(title="Académico API")
 
-# ✅ Usamos Alembic; NO llames create_all()
-@app.on_event("startup")
-def on_startup():
-    with engine.begin() as conn:
-        conn.execute(text("INSERT IGNORE INTO roles (nombre) VALUES ('ADMIN'), ('DOCENTE')"))
 
-from app.api.v1.router import api_router
+@app.on_event("startup")
+def seed_roles() -> None:
+    """Ensure that the default roles exist in the database."""
+    desired_roles = {"ADMIN", "DOCENTE"}
+
+    with Session(engine) as session:
+        existing = {nombre for (nombre,) in session.execute(select(Rol.nombre))}
+        missing = desired_roles - existing
+        if not missing:
+            return
+
+        session.add_all([Rol(nombre=nombre) for nombre in sorted(missing)])
+        session.commit()
+
+
 app.include_router(api_router, prefix="/api/v1")
 
-from fastapi.middleware.cors import CORSMiddleware
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-from fastapi.routing import APIRoute
 
 @app.on_event("startup")
-def log_routes():
+def log_routes() -> None:
+    """Print all registered API routes (useful for debugging)."""
     print("=== RUTAS ===")
-    for r in app.routes:
-        if isinstance(r, APIRoute):
-            print(f"{list(r.methods)} {r.path}")
-
+    for route in app.routes:
+        if isinstance(route, APIRoute):
+            print(f"{sorted(route.methods)} {route.path}")
