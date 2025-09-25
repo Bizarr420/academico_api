@@ -57,10 +57,10 @@ class Persona(Base):
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    ci: Mapped["CIPersona" | None] = relationship(
+    ci: Mapped["CIPersona | None"] = relationship(
         "CIPersona", back_populates="persona", uselist=False
     )
-    usuario: Mapped["Usuario" | None] = relationship(
+    usuario: Mapped["Usuario | None"] = relationship(
         "Usuario", back_populates="persona", uselist=False
     )
 
