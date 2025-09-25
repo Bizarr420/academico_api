@@ -29,7 +29,14 @@ def seed_roles() -> None:
         session.commit()
 
 
+# Nota: la aplicación web espera actualmente que los endpoints vivan bajo
+# ``/api`` mientras que la API estaba versionada en ``/api/v1``.  Esto
+# provocaba errores 404 al autenticarse porque las solicitudes llegaban a
+# ``/auth/login`` sin el prefijo de versión.  Para mantener compatibilidad con
+# el frontend sin romper los clientes que ya usan ``/api/v1`` incluimos el
+# router dos veces, otorgando un alias sin versión.
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/api")
 
 
 app.add_middleware(
