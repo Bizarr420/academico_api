@@ -78,18 +78,22 @@ class SexoEnum(str, Enum):
 class SexoEnumType(TypeDecorator):
     """Custom SQLAlchemy type that normalises ``SexoEnum`` values."""
 
-    impl = String(12)
+    impl = String(1)
     cache_ok = True
 
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
         if isinstance(value, SexoEnum):
-            return value.value
-        if isinstance(value, str):
-            enum_value = SexoEnum._missing_(value) or SexoEnum(value)
-            return enum_value.value
-        raise TypeError(f"Unsupported value for SexoEnum: {value!r}")
+            enum_value = value
+        elif isinstance(value, str):
+            enum_value = SexoEnum._missing_(value)
+            if enum_value is None:
+                enum_value = SexoEnum(value)
+        else:
+            raise TypeError(f"Unsupported value for SexoEnum: {value!r}")
+
+        return enum_value.short_code
 
     def process_result_value(self, value, dialect):
         if value is None:
