@@ -22,6 +22,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 from .base import Base
 
@@ -74,6 +75,34 @@ class SexoEnum(str, Enum):
         return None
 
 
+class SexoEnumType(TypeDecorator):
+    """Custom SQLAlchemy type that normalises ``SexoEnum`` values."""
+
+    impl = String(12)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, SexoEnum):
+            return value.value
+        if isinstance(value, str):
+            enum_value = SexoEnum._missing_(value) or SexoEnum(value)
+            return enum_value.value
+        raise TypeError(f"Unsupported value for SexoEnum: {value!r}")
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        try:
+            return SexoEnum(value)
+        except ValueError:
+            enum_value = SexoEnum._missing_(value)
+            if enum_value is None:
+                raise
+            return enum_value
+
+
 class Rol(Base):
     __tablename__ = "roles"
 
@@ -90,9 +119,7 @@ class Persona(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nombres: Mapped[str] = mapped_column(String(120), nullable=False)
     apellidos: Mapped[str] = mapped_column(String(120), nullable=False)
-    sexo: Mapped[SexoEnum] = mapped_column(
-        SAEnum(SexoEnum, name="sexo_enum", native_enum=False), nullable=False
-    )
+    sexo: Mapped[SexoEnum] = mapped_column(SexoEnumType(), nullable=False)
     fecha_nacimiento: Mapped[date] = mapped_column(Date, nullable=False)
     celular: Mapped[str | None] = mapped_column(String(20))
     direccion: Mapped[str | None] = mapped_column(String(255))
