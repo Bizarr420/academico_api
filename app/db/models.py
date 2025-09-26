@@ -31,11 +31,20 @@ class EstadoUsuarioEnum(str, Enum):
     INACTIVO = "INACTIVO"
 
 
+class SexoEnum(str, Enum):
+    """Sex designation used by :class:`Persona` records."""
+
+    MASCULINO = "M"
+    FEMENINO = "F"
+    OTRO = "X"
+
+
 class Rol(Base):
     __tablename__ = "roles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    codigo: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
 
     usuarios: Mapped[list["Usuario"]] = relationship("Usuario", back_populates="rol")
 
@@ -46,7 +55,9 @@ class Persona(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nombres: Mapped[str] = mapped_column(String(120), nullable=False)
     apellidos: Mapped[str] = mapped_column(String(120), nullable=False)
-    sexo: Mapped[str] = mapped_column(String(1), nullable=False)
+    sexo: Mapped[SexoEnum] = mapped_column(
+        SAEnum(SexoEnum, name="sexo_enum", native_enum=False), nullable=False
+    )
     fecha_nacimiento: Mapped[date] = mapped_column(Date, nullable=False)
     celular: Mapped[str | None] = mapped_column(String(20))
     direccion: Mapped[str | None] = mapped_column(String(255))
@@ -108,7 +119,7 @@ class Estudiante(Base):
     persona_id: Mapped[int] = mapped_column(
         ForeignKey("personas.id", ondelete="CASCADE"), nullable=False
     )
-    codigo_est: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    codigo_est: Mapped[str | None] = mapped_column(String(30), unique=True)
 
     __table_args__ = (UniqueConstraint("codigo_est", name="uq_est_codigo"),)
 
@@ -176,7 +187,7 @@ class Nivel(Base):
     __tablename__ = "niveles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nombre: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    nombre: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     etiqueta: Mapped[str] = mapped_column(String(20), nullable=False)
 
 
@@ -187,8 +198,9 @@ class Curso(Base):
     nivel_id: Mapped[int] = mapped_column(
         ForeignKey("niveles.id", ondelete="CASCADE"), nullable=False
     )
-    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
+    nombre: Mapped[str] = mapped_column(String(60), nullable=False)
     etiqueta: Mapped[str] = mapped_column(String(20), nullable=False)
+    grado: Mapped[int | None] = mapped_column(SmallInteger)
 
     __table_args__ = (
         UniqueConstraint("nivel_id", "nombre", name="uq_cursos_nivel_nombre"),
@@ -203,9 +215,11 @@ class Paralelo(Base):
         ForeignKey("cursos.id", ondelete="CASCADE"), nullable=False
     )
     etiqueta: Mapped[str] = mapped_column(String(10), nullable=False)
+    nombre: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
 
     __table_args__ = (
         UniqueConstraint("curso_id", "etiqueta", name="uq_paralelo"),
+        UniqueConstraint("nombre", name="uq_paralelo_nombre"),
     )
 
 
@@ -254,6 +268,7 @@ class Docente(Base):
         ForeignKey("personas.id", ondelete="CASCADE"), nullable=False, unique=True
     )
     titulo: Mapped[str | None] = mapped_column(String(120))
+    profesion: Mapped[str | None] = mapped_column(String(120))
 
 
 class AsignacionDocente(Base):

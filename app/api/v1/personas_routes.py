@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
+
 from app.api.deps import get_db
-from app.db.models import Persona, CIPersona, SexoEnum, date   # 👈 importa SexoEnum
+from app.db.models import CIPersona, Persona, SexoEnum
 from app.schemas.personas import PersonaCreate, PersonaOut
-from typing import List
-from fastapi import Path
+
+
 router = APIRouter()
 
 @router.post("/", response_model=PersonaOut)
@@ -29,9 +32,6 @@ def crear_persona(data: PersonaCreate, db: Session = Depends(get_db)):
         ))
     db.commit(); db.refresh(p)
     return p
-from typing import List
-from app.schemas.personas import PersonaOut
-
 @router.get("/{persona_id}", response_model=PersonaOut)
 def obtener_persona(persona_id: int = Path(..., gt=0), db: Session = Depends(get_db)):
     p = db.get(Persona, persona_id)
@@ -54,9 +54,10 @@ def actualizar_persona(persona_id: int, data: PersonaUpdate, db: Session = Depen
     for field, value in data.model_dump(exclude_unset=True).items():
         if value is not None:
             if field == "sexo":
-                from app.db.models import SexoEnum
                 setattr(p, field, SexoEnum(value))  # valida 'M','F','X'
             else:
                 setattr(p, field, value)
-    db.add(p); db.commit(); db.refresh(p)
+    db.add(p)
+    db.commit()
+    db.refresh(p)
     return p
