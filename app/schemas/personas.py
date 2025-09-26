@@ -1,17 +1,23 @@
-from pydantic import BaseModel, Field
-from pydantic.config import ConfigDict
 from datetime import date
-from typing import Literal
 
-Sexo = Literal["M","F","X"]
+from pydantic import BaseModel, Field, field_serializer
+from pydantic.config import ConfigDict
+
+from app.db.models import SexoEnum
 
 class PersonaBase(BaseModel):
     nombres: str = Field(min_length=1, max_length=120)
     apellidos: str = Field(min_length=1, max_length=120)
-    sexo: Sexo
+    sexo: SexoEnum
     fecha_nacimiento: date
     celular: str | None = None
     direccion: str | None = None
+
+    @field_serializer("sexo", when_used="json")
+    def serialize_sexo(self, sexo: SexoEnum) -> str:
+        if isinstance(sexo, SexoEnum):
+            return sexo.short_code
+        return str(sexo)
 
 class PersonaCreate(PersonaBase):
     ci_numero: str | None = None
@@ -21,4 +27,4 @@ class PersonaCreate(PersonaBase):
 class PersonaOut(PersonaBase):
     id: int
 
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+    model_config = ConfigDict(from_attributes=True)

@@ -15,7 +15,7 @@ def crear_persona(data: PersonaCreate, db: Session = Depends(get_db)):
     p = Persona(
         nombres=data.nombres,
         apellidos=data.apellidos,
-        sexo=SexoEnum(data.sexo),            # 👈 convierte "F" -> SexoEnum.F
+        sexo=SexoEnum(data.sexo),            # acepta "F" o "FEMENINO"
         fecha_nacimiento=data.fecha_nacimiento,
         celular=data.celular,
         direccion=data.direccion,
@@ -43,7 +43,7 @@ class PersonaUpdate(PersonaCreate):
     # todos opcionales para PATCH-like
     nombres: str | None = None
     apellidos: str | None = None
-    sexo: str | None = None
+    sexo: SexoEnum | None = None
     fecha_nacimiento: date | None = None
 
 @router.put("/{persona_id}", response_model=PersonaOut)
@@ -54,7 +54,7 @@ def actualizar_persona(persona_id: int, data: PersonaUpdate, db: Session = Depen
     for field, value in data.model_dump(exclude_unset=True).items():
         if value is not None:
             if field == "sexo":
-                setattr(p, field, SexoEnum(value))  # valida 'M','F','X'
+                setattr(p, field, SexoEnum(value))  # valida códigos o nombres
             else:
                 setattr(p, field, value)
     db.add(p)
