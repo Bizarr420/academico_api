@@ -8,15 +8,21 @@ from . import (
     asistencia,
     asignaciones,
     auth,
+    docentes,
     cursos,
     evaluaciones,
     estudiantes,
     frontend,
+    gestiones,
     matriculas,
+    niveles,
     notas,
     paralelos,
     personas,
+    planes,
     reportes,
+    roles,
+    usuarios,
 )
 
 api_router = APIRouter()
@@ -27,6 +33,12 @@ api_router.include_router(notas.router,        prefix="/notas",        tags=["no
 api_router.include_router(evaluaciones.router, prefix="/evaluaciones", tags=["evaluaciones"])
 api_router.include_router(cursos.router,       prefix="/cursos",       tags=["cursos"])
 api_router.include_router(paralelos.router,    prefix="/paralelos",    tags=["paralelos"])
+api_router.include_router(niveles.router,      prefix="/niveles",      tags=["niveles"])
+api_router.include_router(gestiones.router,    prefix="/gestiones",    tags=["gestiones"])
+api_router.include_router(docentes.router,     prefix="/docentes",     tags=["docentes"])
+api_router.include_router(usuarios.router,     prefix="/usuarios",     tags=["usuarios"])
+api_router.include_router(roles.router,        prefix="/roles",        tags=["roles"])
+api_router.include_router(planes.router,       prefix="/planes",       tags=["planes"])
 
 # 🔐 usa el alias explícito (evita choques con app.schemas.materias)
 api_router.include_router(materias_router)

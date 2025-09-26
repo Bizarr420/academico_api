@@ -14,6 +14,11 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class UsuarioUpdate(BaseModel):
+    rol_id: int | None = None
+    estado: EstadoUsuarioEnum | None = None
+
+
 class UsuarioOut(BaseModel):
     id: int
     username: str

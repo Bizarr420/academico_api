@@ -11,6 +11,11 @@ class DocenteCreate(DocenteBase):
     pass
 
 
+class DocenteUpdate(BaseModel):
+    titulo: str | None = Field(default=None, max_length=120)
+    profesion: str | None = Field(default=None, max_length=120)
+
+
 class DocenteOut(DocenteBase):
     id: int
 
