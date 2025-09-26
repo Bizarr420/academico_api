@@ -32,11 +32,46 @@ class EstadoUsuarioEnum(str, Enum):
 
 
 class SexoEnum(str, Enum):
-    """Sex designation used by :class:`Persona` records."""
+    """Sex designation used by :class:`Persona` records.
 
-    MASCULINO = "M"
-    FEMENINO = "F"
-    OTRO = "X"
+    The database stores the verbose values (``MASCULINO``, ``FEMENINO`` and
+    ``OTRO``) because previous migrations were generated with those literals.
+    Our API, however, historically used the short codes ``M``, ``F`` and ``X``.
+    To keep backwards compatibility with existing data and payloads we accept
+    both formats by normalising the incoming value inside ``_missing_``.
+    """
+
+    MASCULINO = "MASCULINO"
+    FEMENINO = "FEMENINO"
+    OTRO = "OTRO"
+
+    @property
+    def short_code(self) -> str:
+        """Return the short (``M``/``F``/``X``) representation."""
+
+        return {
+            SexoEnum.MASCULINO: "M",
+            SexoEnum.FEMENINO: "F",
+            SexoEnum.OTRO: "X",
+        }[self]
+
+    @classmethod
+    def _missing_(cls, value):
+        """Allow the enum to be constructed from short codes as well."""
+
+        if isinstance(value, str):
+            normalised = value.strip().upper()
+            if not normalised:
+                return None
+            if normalised in cls.__members__:
+                return cls.__members__[normalised]
+            alias_map = {
+                "M": cls.MASCULINO,
+                "F": cls.FEMENINO,
+                "X": cls.OTRO,
+            }
+            return alias_map.get(normalised)
+        return None
 
 
 class Rol(Base):
