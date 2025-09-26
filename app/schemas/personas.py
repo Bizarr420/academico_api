@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from pydantic.config import ConfigDict
 from datetime import date
 from typing import Literal
 
@@ -19,4 +20,5 @@ class PersonaCreate(PersonaBase):
 
 class PersonaOut(PersonaBase):
     id: int
-    class Config: from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
