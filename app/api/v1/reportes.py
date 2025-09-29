@@ -3,13 +3,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_user
-from app.db.models import Nota, Evaluacion
+from app.api.deps import get_db
+from app.api.deps_extra import require_view
+from app.db.models import Nota, Evaluacion, Usuario
 
 router = APIRouter(tags=["reportes"])
 
 @router.get("/estudiante/{est_id}/notas")
-def notas_estudiante(est_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def notas_estudiante(
+    est_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("REPORTES")),
+):
     q = (
         db.query(
             Evaluacion.titulo,
@@ -32,7 +37,11 @@ def notas_estudiante(est_id: int, db: Session = Depends(get_db), _=Depends(get_c
     ]
 
 @router.get("/curso/{asig_id}/promedios")
-def promedios_curso(asig_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def promedios_curso(
+    asig_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("REPORTES")),
+):
     q = (
         db.query(
             Nota.estudiante_id,

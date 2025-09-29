@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from app.api.deps import get_db, get_current_user
-from app.db.models import Matricula, AsignacionDocente, Estudiante
+from app.api.deps import get_db
+from app.api.deps_extra import require_view
+from app.db.models import Matricula, AsignacionDocente, Estudiante, Usuario
 from app.schemas.matriculas import MatriculaCreate, MatriculaRead
 
 router = APIRouter(tags=["matriculas"])
@@ -13,7 +13,7 @@ router = APIRouter(tags=["matriculas"])
 def create_matricula(
     data: MatriculaCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    _: Usuario = Depends(require_view("MATRICULAS")),
 ):
     # valida asignación / estudiante
     if not db.get(AsignacionDocente, data.asignacion_id):
@@ -42,7 +42,7 @@ def list_matriculas(
     asignacion_id: int | None = None,
     estudiante_id: int | None = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    _: Usuario = Depends(require_view("MATRICULAS")),
 ):
     stmt = select(Matricula)
     if asignacion_id is not None:

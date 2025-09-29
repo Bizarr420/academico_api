@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.api.deps_extra import require_role
-from app.db.models import Nivel
+from app.api.deps_extra import require_role_and_view, require_view
+from app.db.models import Nivel, Usuario
 from app.schemas.niveles import NivelCreate, NivelOut, NivelUpdate
 
 router = APIRouter(tags=["niveles"])
@@ -16,6 +16,7 @@ def listar_niveles(
     db: Session = Depends(get_db),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _: Usuario = Depends(require_view("NIVELES")),
 ):
     return (
         db.query(Nivel)
@@ -27,7 +28,11 @@ def listar_niveles(
 
 
 @router.get("/{nivel_id}", response_model=NivelOut)
-def obtener_nivel(nivel_id: int, db: Session = Depends(get_db)):
+def obtener_nivel(
+    nivel_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("NIVELES")),
+):
     nivel = db.get(Nivel, nivel_id)
     if not nivel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nivel no encontrado")
@@ -38,9 +43,12 @@ def obtener_nivel(nivel_id: int, db: Session = Depends(get_db)):
     "/",
     response_model=NivelOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_role("admin"))],
 )
-def crear_nivel(payload: NivelCreate, db: Session = Depends(get_db)):
+def crear_nivel(
+    payload: NivelCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"admin"}, "NIVELES")),
+):
     existente = db.query(Nivel).filter(Nivel.nombre == payload.nombre).first()
     if existente:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nivel ya existe")
@@ -55,9 +63,13 @@ def crear_nivel(payload: NivelCreate, db: Session = Depends(get_db)):
 @router.patch(
     "/{nivel_id}",
     response_model=NivelOut,
-    dependencies=[Depends(require_role("admin"))],
 )
-def actualizar_nivel(nivel_id: int, payload: NivelUpdate, db: Session = Depends(get_db)):
+def actualizar_nivel(
+    nivel_id: int,
+    payload: NivelUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"admin"}, "NIVELES")),
+):
     nivel = db.get(Nivel, nivel_id)
     if not nivel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nivel no encontrado")

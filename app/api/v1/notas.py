@@ -2,14 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, select
 from typing import List
-from app.api.deps import get_db, get_current_user, require_role
-from app.db.models import Nota, Evaluacion, Estudiante, Matricula
+from app.api.deps import get_db
+from app.api.deps_extra import require_view
+from app.db.models import Nota, Evaluacion, Estudiante, Matricula, Usuario
 from app.schemas.notas import NotaCreate, NotaOut
 
 router = APIRouter()
 
 @router.post("/", response_model=NotaOut)
-def crear_nota(data: NotaCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def crear_nota(
+    data: NotaCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("NOTAS")),
+):
     # 1) Validaciones básicas
     eval_ = db.get(Evaluacion, data.evaluacion_id)
     if not eval_:
@@ -49,14 +54,22 @@ def crear_nota(data: NotaCreate, db: Session = Depends(get_db), _=Depends(get_cu
 
 
 @router.get("/evaluacion/{evaluacion_id}", response_model=List[NotaOut])
-def notas_de_evaluacion(evaluacion_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def notas_de_evaluacion(
+    evaluacion_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("NOTAS")),
+):
     if not db.get(Evaluacion, evaluacion_id):
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
     return db.query(Nota).where(Nota.evaluacion_id == evaluacion_id).order_by(Nota.estudiante_id.asc()).all()
 
 @router.get("/promedio-simple")
-def promedio_simple(estudiante_id: int = Query(..., gt=0), asignacion_id: int = Query(..., gt=0),
-                    db: Session = Depends(get_db), _=Depends(get_current_user)):
+def promedio_simple(
+    estudiante_id: int = Query(..., gt=0),
+    asignacion_id: int = Query(..., gt=0),
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("NOTAS")),
+):
     avg_val = db.query(func.avg(Nota.calificacion)).join(Evaluacion, Nota.evaluacion_id == Evaluacion.id).filter(
         Nota.estudiante_id == estudiante_id,
         Evaluacion.asignacion_id == asignacion_id
@@ -64,8 +77,12 @@ def promedio_simple(estudiante_id: int = Query(..., gt=0), asignacion_id: int = 
     return {"estudiante_id": estudiante_id, "asignacion_id": asignacion_id, "promedio_simple": float(avg_val or 0.0)}
 
 @router.get("/promedio-ponderado")
-def promedio_ponderado(estudiante_id: int = Query(..., gt=0), asignacion_id: int = Query(..., gt=0),
-                       db: Session = Depends(get_db), _=Depends(get_current_user)):
+def promedio_ponderado(
+    estudiante_id: int = Query(..., gt=0),
+    asignacion_id: int = Query(..., gt=0),
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("NOTAS")),
+):
     sum_prod, sum_pond = db.query(
         func.coalesce(func.sum(Nota.calificacion * Evaluacion.ponderacion), 0.0),
         func.coalesce(func.sum(Evaluacion.ponderacion), 0.0)
@@ -85,7 +102,12 @@ class NotaUpdate(BaseModel):
     calificacion: float = Field(ge=0, le=100)
 
 @router.put("/{nota_id}", response_model=NotaOut)
-def actualizar_nota(nota_id: int, body: NotaUpdate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def actualizar_nota(
+    nota_id: int,
+    body: NotaUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("NOTAS")),
+):
     n = db.get(Nota, nota_id)
     if not n:
         raise HTTPException(status_code=404, detail="Nota no encontrada")
@@ -103,7 +125,11 @@ class NotaMasivaIn(BaseModel):
     items: list[NotaItem] = Field(min_length=1)
 
 @router.post("/bulk", response_model=List[NotaOut])
-def crear_notas_masivo(payload: NotaMasivaIn, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def crear_notas_masivo(
+    payload: NotaMasivaIn,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("NOTAS")),
+):
     out: list[Nota] = []
 
     for item in payload.items:

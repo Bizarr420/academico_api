@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.api.deps_extra import require_role
-from app.db.models import Gestion
+from app.api.deps_extra import require_role_and_view, require_view
+from app.db.models import Gestion, Usuario
 from app.schemas.gestiones import GestionCreate, GestionOut, GestionUpdate
 
 router = APIRouter(tags=["gestiones"])
@@ -17,6 +17,7 @@ def listar_gestiones(
     solo_activas: bool = Query(False),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _: Usuario = Depends(require_view("GESTIONES")),
 ):
     q = db.query(Gestion).order_by(Gestion.fecha_inicio.desc())
     if solo_activas:
@@ -25,7 +26,11 @@ def listar_gestiones(
 
 
 @router.get("/{gestion_id}", response_model=GestionOut)
-def obtener_gestion(gestion_id: int, db: Session = Depends(get_db)):
+def obtener_gestion(
+    gestion_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("GESTIONES")),
+):
     gestion = db.get(Gestion, gestion_id)
     if not gestion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gestión no encontrada")
@@ -36,9 +41,12 @@ def obtener_gestion(gestion_id: int, db: Session = Depends(get_db)):
     "/",
     response_model=GestionOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_role("admin"))],
 )
-def crear_gestion(payload: GestionCreate, db: Session = Depends(get_db)):
+def crear_gestion(
+    payload: GestionCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"admin"}, "GESTIONES")),
+):
     if payload.fecha_fin < payload.fecha_inicio:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="fecha_fin debe ser mayor o igual a fecha_inicio")
 
@@ -56,9 +64,13 @@ def crear_gestion(payload: GestionCreate, db: Session = Depends(get_db)):
 @router.patch(
     "/{gestion_id}",
     response_model=GestionOut,
-    dependencies=[Depends(require_role("admin"))],
 )
-def actualizar_gestion(gestion_id: int, payload: GestionUpdate, db: Session = Depends(get_db)):
+def actualizar_gestion(
+    gestion_id: int,
+    payload: GestionUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"admin"}, "GESTIONES")),
+):
     gestion = db.get(Gestion, gestion_id)
     if not gestion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Gestión no encontrada")

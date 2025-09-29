@@ -3,15 +3,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from datetime import date
-from app.api.deps import get_db, get_current_user
-from app.api.deps_extra import require_role
-from app.db.models import Asistencia, Matricula
+from app.api.deps import get_db
+from app.api.deps_extra import require_role_and_view
+from app.db.models import Asistencia, Matricula, Usuario
 from app.schemas.asistencias import AsistenciaCreate, AsistenciaOut, AsistenciaMasivaIn
 
 router = APIRouter(tags=["asistencias"])
 
-@router.post("/", response_model=AsistenciaOut, dependencies=[Depends(require_role("ADMIN", "DOC"))])
-def crear_asistencia(data: AsistenciaCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+@router.post("/", response_model=AsistenciaOut)
+def crear_asistencia(
+    data: AsistenciaCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"ADMIN", "DOC"}, "ASISTENCIAS")),
+):
     ok_mat = db.execute(
         select(Matricula.id).where(
             Matricula.asignacion_id == data.asignacion_id,
@@ -35,8 +39,12 @@ def crear_asistencia(data: AsistenciaCreate, db: Session = Depends(get_db), _=De
     db.add(obj); db.commit(); db.refresh(obj)
     return obj
 
-@router.post("/masivo", dependencies=[Depends(require_role("DOC","ADMIN"))])
-def crear_asistencia_masiva(payload: AsistenciaMasivaIn, db: Session = Depends(get_db), _=Depends(get_current_user)):
+@router.post("/masivo")
+def crear_asistencia_masiva(
+    payload: AsistenciaMasivaIn,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"DOC", "ADMIN"}, "ASISTENCIAS")),
+):
     inserciones = duplicados = no_matric = 0
     for item in payload.items:
         ok_mat = db.execute(
@@ -72,14 +80,14 @@ def crear_asistencia_masiva(payload: AsistenciaMasivaIn, db: Session = Depends(g
     db.commit()
     return {"insertados": inserciones, "duplicados": duplicados, "no_matriculados": no_matric}
 
-@router.get("/", response_model=list[AsistenciaOut], dependencies=[Depends(require_role("ADMIN","DOC"))])
+@router.get("/", response_model=list[AsistenciaOut])
 def listar_asistencias(
     asignacion_id: int = Query(..., gt=0),
     fecha: date | None = None,
     desde: date | None = None,
     hasta: date | None = None,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    _: Usuario = Depends(require_role_and_view({"ADMIN", "DOC"}, "ASISTENCIAS")),
 ):
     q = db.query(Asistencia).where(Asistencia.asignacion_id == asignacion_id)
     if fecha:
@@ -90,6 +98,10 @@ def listar_asistencias(
         q = q.where(Asistencia.fecha <= hasta)
     return q.order_by(Asistencia.fecha.asc(), Asistencia.estudiante_id.asc()).all()
 
-@router.get("/estudiante/{est_id}", response_model=list[AsistenciaOut], dependencies=[Depends(require_role("ADMIN","DOC","PAD"))])
-def asistencias_estudiante(est_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+@router.get("/estudiante/{est_id}", response_model=list[AsistenciaOut])
+def asistencias_estudiante(
+    est_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"ADMIN", "DOC", "PAD"}, "ASISTENCIAS")),
+):
     return db.query(Asistencia).where(Asistencia.estudiante_id == est_id).order_by(Asistencia.fecha.desc()).all()

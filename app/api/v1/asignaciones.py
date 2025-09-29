@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, get_current_user
-from app.db.models import AsignacionDocente, Docente, Materia, Curso, Paralelo, Gestion
+
+from app.api.deps import get_db
+from app.api.deps_extra import require_view
+from app.db.models import AsignacionDocente, Docente, Gestion, Materia, Curso, Paralelo, Usuario
 
 router = APIRouter(tags=["asignaciones"])
 
-@router.post("/", dependencies=[Depends(get_current_user)])
+@router.post("/")
 def crear_asignacion(
     data: dict,  # o tu esquema
     db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("ASIGNACIONES")),
 ):
     # data: {gestion: "2025", docente_id, materia_id, curso_id, paralelo_id}
     g = db.query(Gestion).filter(Gestion.nombre == data["gestion"]).first()
@@ -39,7 +42,7 @@ def crear_asignacion(
     db.add(a); db.commit(); db.refresh(a)
     return a
 
-@router.get("/", dependencies=[Depends(get_current_user)])
+@router.get("/")
 def listar_asignaciones(
     gestion: str | None = Query(default=None),
     docente_id: int | None = Query(default=None),
@@ -47,6 +50,7 @@ def listar_asignaciones(
     paralelo_id: int | None = Query(default=None),
     materia_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("ASIGNACIONES")),
 ):
     q = db.query(AsignacionDocente)
     if gestion is not None:

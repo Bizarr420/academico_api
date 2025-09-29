@@ -22,6 +22,7 @@ from . import (
     reportes,
     roles,
     usuarios,
+    auditoria,
 )
 
 api_router = APIRouter()
@@ -47,3 +48,4 @@ api_router.include_router(asignaciones.router, prefix="/asignaciones", tags=["as
 api_router.include_router(matriculas.router,   prefix="/matriculas",   tags=["matriculas"])
 api_router.include_router(reportes.router,     prefix="/reportes",     tags=["reportes"])
 api_router.include_router(alertas.router, prefix="/alertas", tags=["alertas"])
+api_router.include_router(auditoria.router,    prefix="/auditoria",   tags=["auditoria"])
