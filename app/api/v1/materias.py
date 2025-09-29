@@ -1,9 +1,11 @@
 # app/api/v1/materias.py
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, get_current_user
+
+from app.api.deps import get_db
 #from app.api.deps_extra import require_role
-from app.db.models import Materia
+from app.api.deps_extra import require_view
+from app.db.models import Materia, Usuario
 from app.schemas.materias import MateriaCreate, MateriaOut, MateriaUpdate
 from sqlalchemy.exc import IntegrityError
 from fastapi import status
@@ -16,7 +18,11 @@ router = APIRouter(
 
 
 @router.get("", response_model=list[MateriaOut])
-def listar_materias(q: str | None = Query(None), db: Session = Depends(get_db), _=Depends(get_current_user)):
+def listar_materias(
+    q: str | None = Query(None),
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("MATERIAS")),
+):
     query = db.query(Materia)
     if q:
         q_like = f"%{q}%"
@@ -24,7 +30,11 @@ def listar_materias(q: str | None = Query(None), db: Session = Depends(get_db), 
     return query.order_by(Materia.nombre.asc()).all()
 
 @router.post("", response_model=MateriaOut, status_code=status.HTTP_201_CREATED)
-def crear_materia(data: MateriaCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def crear_materia(
+    data: MateriaCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("MATERIAS")),
+):
     try:
         # opcional: check rápido por código duplicado
         if db.query(Materia).filter(Materia.codigo == data.codigo).first():
@@ -47,7 +57,12 @@ def crear_materia(data: MateriaCreate, db: Session = Depends(get_db), _=Depends(
         raise HTTPException(status_code=400, detail=f"error al crear materia: {str(e)}")
 
 @router.put("/{materia_id}", response_model=MateriaOut)
-def editar_materia(materia_id:int, data: MateriaUpdate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def editar_materia(
+    materia_id:int,
+    data: MateriaUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("MATERIAS")),
+):
     m = db.get(Materia, materia_id)
     if not m:
         raise HTTPException(404, "Materia no encontrada")
@@ -60,7 +75,11 @@ def editar_materia(materia_id:int, data: MateriaUpdate, db: Session = Depends(ge
     return m
 
 @router.delete("/{materia_id}")
-def borrar_materia(materia_id:int, db:Session=Depends(get_db), _=Depends(get_current_user)):
+def borrar_materia(
+    materia_id:int,
+    db:Session=Depends(get_db),
+    _: Usuario = Depends(require_view("MATERIAS")),
+):
     m = db.get(Materia, materia_id)
     if not m: raise HTTPException(404, "Materia no encontrada")
     db.delete(m); db.commit()

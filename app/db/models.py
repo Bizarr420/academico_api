@@ -8,6 +8,7 @@ from enum import Enum
 
 from sqlalchemy import (
     CheckConstraint,
+    Column,
     Date,
     DateTime,
     Enum as SAEnum,
@@ -18,6 +19,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Table,
     UniqueConstraint,
     func,
 )
@@ -115,6 +117,30 @@ class Rol(Base):
     codigo: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
 
     usuarios: Mapped[list["Usuario"]] = relationship("Usuario", back_populates="rol")
+    vistas: Mapped[list["Vista"]] = relationship(
+        "Vista", secondary="rol_vistas", back_populates="roles"
+    )
+
+
+rol_vistas = Table(
+    "rol_vistas",
+    Base.metadata,
+    Column("rol_id", ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
+    Column("vista_id", ForeignKey("vistas.id", ondelete="CASCADE"), primary_key=True),
+    UniqueConstraint("rol_id", "vista_id", name="uq_rol_vista"),
+)
+
+
+class Vista(Base):
+    __tablename__ = "vistas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nombre: Mapped[str] = mapped_column(String(60), nullable=False)
+    codigo: Mapped[str] = mapped_column(String(60), unique=True, nullable=False)
+
+    roles: Mapped[list[Rol]] = relationship(
+        "Rol", secondary="rol_vistas", back_populates="vistas"
+    )
 
 
 class Persona(Base):
@@ -176,6 +202,23 @@ class Usuario(Base):
 
     persona: Mapped[Persona] = relationship("Persona", back_populates="usuario")
     rol: Mapped[Rol | None] = relationship("Rol", back_populates="usuarios")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))
+    accion: Mapped[str] = mapped_column(String(60), nullable=False)
+    entidad: Mapped[str] = mapped_column(String(60), nullable=False)
+    entidad_id: Mapped[str | None] = mapped_column(String(60))
+    ip_origen: Mapped[str | None] = mapped_column(String(45))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+    actor: Mapped[Usuario | None] = relationship("Usuario")
 
 
 class Estudiante(Base):

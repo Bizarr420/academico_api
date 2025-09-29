@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func, cast, Float
 from datetime import date, timedelta
 
-from app.api.deps import get_db, get_current_user
-from app.db.models import Alerta, Asistencia
+from app.api.deps import get_db
+from app.api.deps_extra import require_view
+from app.db.models import Alerta, Asistencia, Usuario
 from app.schemas.alertas import AlertaOut, AlertaUpdate
 
 router = APIRouter(tags=["alertas"])  # prefix lo pone router.py
@@ -55,7 +56,7 @@ def _test():
     return {"ok": True}
 
 
-@router.post("/recalcular", status_code=status.HTTP_201_CREATED, dependencies=[Depends(get_current_user)])
+@router.post("/recalcular", status_code=status.HTTP_201_CREATED)
 def recalcular_alertas(
     gestion: int = Query(..., ge=2000, le=2100),
     curso_id: int | None = Query(None),
@@ -63,6 +64,7 @@ def recalcular_alertas(
     faltas_max: int = Query(3, ge=0),
     dias: int = Query(30, ge=1),
     db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("ALERTAS")),
 ):
     Asg = _get_asignacion_model()
     Nota, Evaluacion, nota_col = _get_models_for_promedio()
@@ -144,7 +146,7 @@ def recalcular_alertas(
 
 # app/api/v1/alertas.py
 
-@router.get("", dependencies=[Depends(get_current_user)])
+@router.get("")
 def listar(
     gestion: int | None = Query(None),
     curso_id: int | None = Query(None),
@@ -153,6 +155,7 @@ def listar(
     page: int = Query(1, ge=1),
     size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("ALERTAS")),
 ):
     from app.db.models import Alerta, AsignacionDocente as Asg
 
@@ -187,8 +190,13 @@ def listar(
     return {"items": items, "total": total, "page": page, "size": size}
 
 
-@router.put("/{alerta_id}", response_model=AlertaOut, dependencies=[Depends(get_current_user)])
-def actualizar(alerta_id: int, payload: AlertaUpdate, db: Session = Depends(get_db)):
+@router.put("/{alerta_id}", response_model=AlertaOut)
+def actualizar(
+    alerta_id: int,
+    payload: AlertaUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("ALERTAS")),
+):
     obj = db.get(Alerta, alerta_id)
     if not obj:
         raise HTTPException(404, "Alerta no encontrada")

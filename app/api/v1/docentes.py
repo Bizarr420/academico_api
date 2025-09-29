@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.api.deps_extra import require_role
-from app.db.models import Docente, Persona
+from app.api.deps_extra import require_role_and_view, require_view
+from app.db.models import Docente, Persona, Usuario
 from app.schemas.docentes import DocenteCreate, DocenteOut, DocenteUpdate
 
 router = APIRouter(tags=["docentes"])
@@ -17,6 +17,7 @@ def listar_docentes(
     persona_id: int | None = Query(None, ge=1),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _: Usuario = Depends(require_view("DOCENTES")),
 ):
     q = db.query(Docente)
     if persona_id is not None:
@@ -25,7 +26,11 @@ def listar_docentes(
 
 
 @router.get("/{docente_id}", response_model=DocenteOut)
-def obtener_docente(docente_id: int, db: Session = Depends(get_db)):
+def obtener_docente(
+    docente_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("DOCENTES")),
+):
     docente = db.get(Docente, docente_id)
     if not docente:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Docente no encontrado")
@@ -36,9 +41,12 @@ def obtener_docente(docente_id: int, db: Session = Depends(get_db)):
     "/",
     response_model=DocenteOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_role("admin"))],
 )
-def crear_docente(payload: DocenteCreate, db: Session = Depends(get_db)):
+def crear_docente(
+    payload: DocenteCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"admin"}, "DOCENTES")),
+):
     persona = db.get(Persona, payload.persona_id)
     if not persona:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Persona no encontrada")
@@ -57,9 +65,13 @@ def crear_docente(payload: DocenteCreate, db: Session = Depends(get_db)):
 @router.patch(
     "/{docente_id}",
     response_model=DocenteOut,
-    dependencies=[Depends(require_role("admin"))],
 )
-def actualizar_docente(docente_id: int, payload: DocenteUpdate, db: Session = Depends(get_db)):
+def actualizar_docente(
+    docente_id: int,
+    payload: DocenteUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"admin"}, "DOCENTES")),
+):
     docente = db.get(Docente, docente_id)
     if not docente:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Docente no encontrado")

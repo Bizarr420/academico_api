@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.api.deps_extra import require_role
-from app.db.models import Curso, Materia, PlanCursoMateria
+from app.api.deps_extra import require_role_and_view, require_view
+from app.db.models import Curso, Materia, PlanCursoMateria, Usuario
 from app.schemas.planes import (
     PlanCursoMateriaCreate,
     PlanCursoMateriaOut,
@@ -22,6 +22,7 @@ def listar_planes(
     materia_id: int | None = Query(None, ge=1),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _: Usuario = Depends(require_view("PLANES")),
 ):
     q = db.query(PlanCursoMateria)
     if curso_id is not None:
@@ -35,9 +36,12 @@ def listar_planes(
     "/",
     response_model=PlanCursoMateriaOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_role("admin"))],
 )
-def crear_plan(payload: PlanCursoMateriaCreate, db: Session = Depends(get_db)):
+def crear_plan(
+    payload: PlanCursoMateriaCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"admin"}, "PLANES")),
+):
     if not db.get(Curso, payload.curso_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Curso no encontrado")
     if not db.get(Materia, payload.materia_id):
@@ -64,9 +68,13 @@ def crear_plan(payload: PlanCursoMateriaCreate, db: Session = Depends(get_db)):
 @router.patch(
     "/{plan_id}",
     response_model=PlanCursoMateriaOut,
-    dependencies=[Depends(require_role("admin"))],
 )
-def actualizar_plan(plan_id: int, payload: PlanCursoMateriaUpdate, db: Session = Depends(get_db)):
+def actualizar_plan(
+    plan_id: int,
+    payload: PlanCursoMateriaUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_role_and_view({"admin"}, "PLANES")),
+):
     plan = db.get(PlanCursoMateria, plan_id)
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan no encontrado")
