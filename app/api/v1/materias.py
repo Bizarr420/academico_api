@@ -20,6 +20,8 @@ router = APIRouter(
 @router.get("", response_model=list[MateriaOut])
 def listar_materias(
     q: str | None = Query(None),
+    area: str | None = Query(None),
+    estado: str | None = Query(None),
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_view("MATERIAS")),
 ):
@@ -27,6 +29,13 @@ def listar_materias(
     if q:
         q_like = f"%{q}%"
         query = query.filter((Materia.nombre.ilike(q_like)) | (Materia.codigo.ilike(q_like)))
+    if area:
+        query = query.filter(Materia.area.ilike(f"%{area}%"))
+    if estado:
+        estado_norm = estado.strip().upper()
+        if estado_norm not in {"ACTIVO", "INACTIVO"}:
+            raise HTTPException(status_code=400, detail="estado inválido")
+        query = query.filter(Materia.estado == estado_norm)
     return query.order_by(Materia.nombre.asc()).all()
 
 @router.post("", response_model=MateriaOut, status_code=status.HTTP_201_CREATED)
@@ -40,7 +49,11 @@ def crear_materia(
         if db.query(Materia).filter(Materia.codigo == data.codigo).first():
             raise HTTPException(status_code=400, detail="codigo ya existe")
 
-        m = Materia(**data.model_dump())
+        payload = data.model_dump()
+        payload["estado"] = payload["estado"].upper()
+        if payload["estado"] not in {"ACTIVO", "INACTIVO"}:
+            raise HTTPException(status_code=400, detail="estado inválido")
+        m = Materia(**payload)
         db.add(m)
         db.commit()
         db.refresh(m)
@@ -69,8 +82,14 @@ def editar_materia(
     if data.codigo and data.codigo != m.codigo:
         if db.query(Materia).filter(Materia.codigo == data.codigo).first():
             raise HTTPException(400, "codigo ya existe")
-    for k,v in data.model_dump(exclude_unset=True).items():
-        setattr(m, k, v)
+    for k, v in data.model_dump(exclude_unset=True).items():
+        if k == "estado" and v is not None:
+            estado_norm = v.upper()
+            if estado_norm not in {"ACTIVO", "INACTIVO"}:
+                raise HTTPException(status_code=400, detail="estado inválido")
+            setattr(m, k, estado_norm)
+        else:
+            setattr(m, k, v)
     db.commit(); db.refresh(m)
     return m
 
