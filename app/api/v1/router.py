@@ -19,6 +19,7 @@ from . import (
     paralelos,
     personas,
     planes,
+    vistas,
     reportes,
     roles,
     usuarios,
@@ -39,6 +40,7 @@ api_router.include_router(docentes.router,     prefix="/docentes",     tags=["do
 api_router.include_router(usuarios.router,     prefix="/usuarios",     tags=["usuarios"])
 api_router.include_router(roles.router,        prefix="/roles",        tags=["roles"])
 api_router.include_router(planes.router,       prefix="/planes",       tags=["planes"])
+api_router.include_router(vistas.router,       prefix="/vistas",       tags=["vistas"])
 
 # 🔐 usa el alias explícito (evita choques con app.schemas.materias)
 api_router.include_router(materias_router)
