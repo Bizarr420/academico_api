@@ -4,11 +4,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class AsignacionBase(BaseModel):
-    docente_id: int
-    materia_id: int
-    curso_id: int
-    paralelo_id: int
-    gestion: str = Field(..., max_length=10)
+    gestion_id: int = Field(gt=0)
+    docente_id: int = Field(gt=0)
+    materia_id: int = Field(gt=0)
+    curso_id: int = Field(gt=0)
+    paralelo_id: int = Field(gt=0)
 
 
 class AsignacionCreate(AsignacionBase):
