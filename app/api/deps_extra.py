@@ -55,8 +55,9 @@ def require_role(*codes: Iterable[str] | str):
         db: Session = Depends(get_db),
     ) -> Usuario:
         rol = _load_rol(user, db)
+        codigo = rol.codigo.upper() if rol and rol.codigo else None
         nombre = rol.nombre.upper() if rol and rol.nombre else None
-        if nombre in allowed:
+        if codigo in allowed or nombre in allowed:
             return user
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -75,8 +76,9 @@ def require_role_and_view(roles: Iterable[str], view_code: str):
         db: Session = Depends(get_db),
     ) -> Usuario:
         rol = _load_rol(user, db)
+        codigo = rol.codigo.upper() if rol and rol.codigo else None
         nombre = rol.nombre.upper() if rol and rol.nombre else None
-        if nombre not in allowed_roles:
+        if codigo not in allowed_roles and nombre not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Permisos insuficientes",
