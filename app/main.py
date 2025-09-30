@@ -23,13 +23,22 @@ def seed_roles() -> None:
     )
 
     with Session(engine) as session:
-        existing_names = {nombre for (nombre,) in session.execute(select(Rol.nombre))}
-        existing_codes = {codigo for (codigo,) in session.execute(select(Rol.codigo))}
+        existing_names = {
+            nombre.upper()
+            for (nombre,) in session.execute(select(Rol.nombre))
+            if nombre is not None
+        }
+        existing_codes = {
+            codigo.upper()
+            for (codigo,) in session.execute(select(Rol.codigo))
+            if codigo is not None
+        }
 
         missing_roles = [
             Rol(nombre=nombre, codigo=codigo)
             for nombre, codigo in desired_roles
-            if nombre not in existing_names and codigo not in existing_codes
+            if nombre.upper() not in existing_names
+            and codigo.upper() not in existing_codes
         ]
 
         if not missing_roles:
