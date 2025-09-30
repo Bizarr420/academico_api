@@ -17,15 +17,25 @@ app = FastAPI(title="Académico API")
 @app.on_event("startup")
 def seed_roles() -> None:
     """Ensure that the default roles exist in the database."""
-    desired_roles = {"ADMIN", "DOCENTE"}
+    desired_roles = (
+        ("ADMIN", "ADMIN"),
+        ("DOCENTE", "DOC"),
+    )
 
     with Session(engine) as session:
-        existing = {nombre for (nombre,) in session.execute(select(Rol.nombre))}
-        missing = desired_roles - existing
-        if not missing:
+        existing_names = {nombre for (nombre,) in session.execute(select(Rol.nombre))}
+        existing_codes = {codigo for (codigo,) in session.execute(select(Rol.codigo))}
+
+        missing_roles = [
+            Rol(nombre=nombre, codigo=codigo)
+            for nombre, codigo in desired_roles
+            if nombre not in existing_names and codigo not in existing_codes
+        ]
+
+        if not missing_roles:
             return
 
-        session.add_all([Rol(nombre=nombre) for nombre in sorted(missing)])
+        session.add_all(missing_roles)
         session.commit()
 
 
