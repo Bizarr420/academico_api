@@ -45,7 +45,7 @@ def seed_roles() -> None:
 # ``/auth/login`` sin el prefijo de versión.  Para mantener compatibilidad con
 # el frontend sin romper los clientes que ya usan ``/api/v1`` incluimos el
 # router dos veces, otorgando un alias sin versión.
-app.include_router(api_router, prefix="/api/v1")
+#app.include_router(api_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/api")
 
 
