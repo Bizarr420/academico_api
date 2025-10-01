@@ -79,21 +79,21 @@ def test_crear_estudiante_con_persona_id(db_session):
     db_session.add(persona)
     db_session.commit()
 
-    payload = EstudianteCreate(persona_id=persona.id, codigo_est="EST-001")
+    payload = EstudianteCreate(persona_id=persona.id, codigo_rude="RUDE-001")
 
     estudiante = crear_estudiante(payload, db_session)
 
     assert estudiante.id is not None
     assert estudiante.persona_id == persona.id
     assert estudiante.persona is not None
-    assert estudiante.codigo_est == "EST-001"
+    assert estudiante.codigo_rude == "RUDE-001"
     assert estudiante.anio_ingreso == date.today().year
     assert estudiante.situacion == models.SituacionEstudianteEnum.REGULAR.value
     assert estudiante.estado == models.EstadoEstudianteEnum.ACTIVO.value
 
 
 def test_crear_estudiante_con_persona_nueva(db_session):
-    payload = EstudianteCreate(persona=build_persona_payload(ci="CI-123"), codigo_est="EST-002")
+    payload = EstudianteCreate(persona=build_persona_payload(ci="CI-123"), codigo_rude="RUDE-002")
 
     estudiante = crear_estudiante(payload, db_session)
 
@@ -107,13 +107,13 @@ def test_crear_estudiante_con_persona_nueva(db_session):
 
 def test_crear_estudiante_con_ci_duplicado(db_session):
     crear_estudiante(
-        EstudianteCreate(persona=build_persona_payload(ci="CI-777"), codigo_est="EST-100"),
+        EstudianteCreate(persona=build_persona_payload(ci="CI-777"), codigo_rude="RUDE-100"),
         db_session,
     )
 
     with pytest.raises(HTTPException) as excinfo:
         crear_estudiante(
-            EstudianteCreate(persona=build_persona_payload(ci="CI-777"), codigo_est="EST-101"),
+            EstudianteCreate(persona=build_persona_payload(ci="CI-777"), codigo_rude="RUDE-101"),
             db_session,
         )
 
@@ -153,7 +153,7 @@ def test_crear_docente_con_persona_nueva(db_session):
 
 def test_crear_docente_con_ci_duplicado(db_session):
     crear_estudiante(
-        EstudianteCreate(persona=build_persona_payload(ci="CI-999"), codigo_est="EST-200"),
+        EstudianteCreate(persona=build_persona_payload(ci="CI-999"), codigo_rude="RUDE-200"),
         db_session,
     )
 

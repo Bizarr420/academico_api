@@ -19,7 +19,7 @@ class EstadoEstudianteEnum(str, Enum):
 
 
 class EstudianteBase(BaseModel):
-    codigo_est: str = Field(..., min_length=1, max_length=50)
+    codigo_rude: str = Field(..., min_length=1, max_length=50)
     anio_ingreso: int | None = Field(
         default=None,
         ge=1900,
