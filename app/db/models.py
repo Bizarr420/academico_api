@@ -191,7 +191,7 @@ class Usuario(Base):
     )
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
-    rol_id: Mapped[int | None] = mapped_column(ForeignKey("roles.id"))
+    rol_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), nullable=False)
     estado: Mapped[EstadoUsuarioEnum] = mapped_column(
         SAEnum(EstadoUsuarioEnum), nullable=False, default=EstadoUsuarioEnum.ACTIVO
     )
@@ -201,7 +201,7 @@ class Usuario(Base):
     )
 
     persona: Mapped[Persona] = relationship("Persona", back_populates="usuario")
-    rol: Mapped[Rol | None] = relationship("Rol", back_populates="usuarios")
+    rol: Mapped[Rol] = relationship("Rol", back_populates="usuarios")
 
 
 class AuditLog(Base):
