@@ -100,6 +100,9 @@ def test_crear_estudiante_con_codigo_valido(client):
     assert body["persona_id"] > 0
     assert body["persona"]["nombres"] == "Laura"
     assert body["persona"]["sexo"] == models.SexoEnum.FEMENINO.short_code
+    assert body["anio_ingreso"] == date.today().year
+    assert body["situacion"] == "REGULAR"
+    assert body["estado"] == "ACTIVO"
 
 
 def test_crear_estudiante_sin_codigo_retorna_400(client):

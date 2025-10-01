@@ -221,6 +221,22 @@ class AuditLog(Base):
     actor: Mapped[Usuario | None] = relationship("Usuario")
 
 
+class SituacionEstudianteEnum(str, Enum):
+    """Academic status for :class:`Estudiante` records."""
+
+    REGULAR = "REGULAR"
+    RETIRADO = "RETIRADO"
+    EGRESADO = "EGRESADO"
+    CONDICIONAL = "CONDICIONAL"
+
+
+class EstadoEstudianteEnum(str, Enum):
+    """Lifecycle status for :class:`Estudiante` records."""
+
+    ACTIVO = "ACTIVO"
+    INACTIVO = "INACTIVO"
+
+
 class Estudiante(Base):
     __tablename__ = "estudiantes"
 
@@ -228,11 +244,41 @@ class Estudiante(Base):
     persona_id: Mapped[int] = mapped_column(
         ForeignKey("personas.id", ondelete="CASCADE"), nullable=False
     )
-    codigo_est: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    codigo_est: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        unique=True,
+    )
+    anio_ingreso: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=0, server_default="0"
+    )
+    situacion: Mapped[str] = mapped_column(
+        SAEnum(
+            SituacionEstudianteEnum,
+            name="est_situacion_enum",
+            native_enum=False,
+        ),
+        nullable=False,
+        default=SituacionEstudianteEnum.REGULAR.value,
+        server_default=SituacionEstudianteEnum.REGULAR.value,
+    )
+    estado: Mapped[str] = mapped_column(
+        SAEnum(
+            EstadoEstudianteEnum,
+            name="est_estado_enum",
+            native_enum=False,
+        ),
+        nullable=False,
+        default=EstadoEstudianteEnum.ACTIVO.value,
+        server_default=EstadoEstudianteEnum.ACTIVO.value,
+    )
 
     persona: Mapped[Persona] = relationship("Persona")
 
-    __table_args__ = (UniqueConstraint("codigo_est", name="uq_est_codigo"),)
+    __table_args__ = (
+        UniqueConstraint("codigo_est", name="uq_est_codigo"),
+        UniqueConstraint("persona_id", name="uq_estudiantes_persona"),
+    )
 
 
 class TipoEvalEnum(str, Enum):

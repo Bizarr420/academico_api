@@ -1,10 +1,33 @@
+from enum import Enum
+from datetime import date
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.personas import PersonaCreate, PersonaOut
 
 
+class SituacionEstudianteEnum(str, Enum):
+    REGULAR = "REGULAR"
+    RETIRADO = "RETIRADO"
+    EGRESADO = "EGRESADO"
+    CONDICIONAL = "CONDICIONAL"
+
+
+class EstadoEstudianteEnum(str, Enum):
+    ACTIVO = "ACTIVO"
+    INACTIVO = "INACTIVO"
+
+
 class EstudianteBase(BaseModel):
     codigo_est: str = Field(..., min_length=1, max_length=50)
+    anio_ingreso: int | None = Field(
+        default=None,
+        ge=1900,
+        le=date.today().year + 1,
+        description="Año de ingreso al establecimiento",
+    )
+    situacion: SituacionEstudianteEnum = SituacionEstudianteEnum.REGULAR
+    estado: EstadoEstudianteEnum = EstadoEstudianteEnum.ACTIVO
 
 
 class EstudianteCreate(EstudianteBase):
