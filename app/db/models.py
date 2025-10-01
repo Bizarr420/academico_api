@@ -244,7 +244,7 @@ class Estudiante(Base):
     persona_id: Mapped[int] = mapped_column(
         ForeignKey("personas.id", ondelete="CASCADE"), nullable=False
     )
-    codigo_est: Mapped[str] = mapped_column(
+    codigo_rude: Mapped[str] = mapped_column(
         String(30),
         nullable=False,
         unique=True,
@@ -276,7 +276,7 @@ class Estudiante(Base):
     persona: Mapped[Persona] = relationship("Persona")
 
     __table_args__ = (
-        UniqueConstraint("codigo_est", name="uq_est_codigo"),
+        UniqueConstraint("codigo_rude", name="uq_estudiantes_rude"),
         UniqueConstraint("persona_id", name="uq_estudiantes_persona"),
     )
 

@@ -20,7 +20,7 @@ def test_estudiante_out_accepts_orm_objects():
     estudiante = models.Estudiante(
         id=1,
         persona_id=persona.id,
-        codigo_est="ABC123",
+        codigo_rude="ABC123",
         anio_ingreso=2024,
         situacion=models.SituacionEstudianteEnum.REGULAR.value,
         estado=models.EstadoEstudianteEnum.ACTIVO.value,
@@ -31,7 +31,7 @@ def test_estudiante_out_accepts_orm_objects():
 
     assert schema.id == 1
     assert schema.persona_id == 2
-    assert schema.codigo_est == "ABC123"
+    assert schema.codigo_rude == "ABC123"
     assert schema.anio_ingreso == 2024
     assert schema.situacion == models.SituacionEstudianteEnum.REGULAR
     assert schema.estado == models.EstadoEstudianteEnum.ACTIVO
