@@ -9,74 +9,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from sqlalchemy import func
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.api.v1.router import api_router
 from app.core.security import hash_password
-from app.db.models import (
-    EstadoUsuarioEnum,
-    Persona,
-    Rol,
-    SexoEnum,
-    Usuario,
-    Vista,
-)
+from app.db.models import EstadoUsuarioEnum, Persona, SexoEnum, Usuario
 from app.db.session import engine
 
 
 app = FastAPI(title="Académico API")
 
-
-DEFAULT_VISTAS: Final[dict[str, str]] = {
-    "USUARIOS": "Usuarios",
-    "ROLES": "Roles",
-    "VISTAS": "Vistas",
-    "PLANES": "Planes de estudio",
-    "GESTIONES": "Gestiones",
-    "NIVELES": "Niveles",
-    "DOCENTES": "Docentes",
-    "ASISTENCIAS": "Asistencias",
-    "CURSOS": "Cursos",
-    "ALERTAS": "Alertas",
-    "NOTAS": "Notas",
-    "MATERIAS": "Materias",
-    "REPORTES": "Reportes",
-    "PARALELOS": "Paralelos",
-    "ASIGNACIONES": "Asignaciones",
-    "MATRICULAS": "Matrículas",
-    "AUDITORIA": "Auditoría",
-}
-
-ROLE_TEMPLATES: Final[tuple[dict[str, object], ...]] = (
-    {
-        "nombre": "Administrador",
-        "codigo": "ADMIN",
-        "vista_codes": tuple(DEFAULT_VISTAS.keys()),
-    },
-    {
-        "nombre": "Docente",
-        "codigo": "DOC",
-        "vista_codes": (
-            "ASISTENCIAS",
-            "NOTAS",
-            "CURSOS",
-            "MATERIAS",
-            "ASIGNACIONES",
-            "REPORTES",
-            "ALERTAS",
-        ),
-    },
-    {
-        "nombre": "Padre de familia",
-        "codigo": "PAD",
-        "vista_codes": (
-            "ASISTENCIAS",
-            "NOTAS",
-            "REPORTES",
-            "ALERTAS",
-        ),
-    },
-)
 
 SUPERUSER_USERNAME: Final[str] = "root"
 SUPERUSER_PASSWORD: Final[str] = "CambiarAhora123!"
@@ -87,107 +29,45 @@ SUPERUSER_BIRTHDATE: Final[date] = date(1980, 1, 1)
 
 @app.on_event("startup")
 def bootstrap_access_control() -> None:
-    """Synchronise vistas, roles and privileged users with the database."""
+    """Ensure a default superuser exists while role management is disabled."""
 
     with Session(engine) as session:
-        vistas_by_code: dict[str, Vista] = {
-            vista.codigo.upper(): vista for vista in session.query(Vista).all()
-        }
-
-        for code, name in DEFAULT_VISTAS.items():
-            vista = vistas_by_code.get(code)
-            if vista is None:
-                vista = Vista(nombre=name, codigo=code)
-                session.add(vista)
-                session.flush()
-                vistas_by_code[code] = vista
-            else:
-                updated = False
-                if vista.nombre != name:
-                    vista.nombre = name
-                    updated = True
-                if vista.codigo != code:
-                    vista.codigo = code
-                    updated = True
-                if updated:
-                    session.add(vista)
-                vistas_by_code[code] = vista
-
-        session.flush()
-
-        for template in ROLE_TEMPLATES:
-            codigo = template["codigo"]
-            vista_codes = tuple(template["vista_codes"])
-            vistas = [vistas_by_code[view_code] for view_code in vista_codes]
-
-            rol: Rol | None = (
-                session.query(Rol)
-                .options(selectinload(Rol.vistas))
-                .filter(func.upper(Rol.codigo) == codigo)
-                .first()
+        persona = (
+            session.query(Persona)
+            .filter(
+                func.lower(Persona.nombres) == SUPERUSER_NAMES.lower(),
+                func.lower(Persona.apellidos) == SUPERUSER_LASTNAMES.lower(),
             )
-            if rol is None:
-                rol = Rol(nombre=template["nombre"], codigo=codigo)
-                session.add(rol)
-                session.flush()
-            else:
-                rol.nombre = template["nombre"]
-                rol.codigo = codigo
-
-            rol.vistas = vistas
-            session.add(rol)
-
-        session.flush()
-
-        admin_role: Rol | None = (
-            session.query(Rol)
-            .filter(func.upper(Rol.codigo) == "ADMIN")
             .first()
         )
-
-        if admin_role is not None:
-            admin_user = (
-                session.query(Usuario)
-                .filter(func.lower(Usuario.username) == "admin")
-                .first()
+        if persona is None:
+            persona = Persona(
+                nombres=SUPERUSER_NAMES,
+                apellidos=SUPERUSER_LASTNAMES,
+                sexo=SexoEnum.MASCULINO,
+                fecha_nacimiento=SUPERUSER_BIRTHDATE,
             )
-            if admin_user is not None and admin_user.rol_id != admin_role.id:
-                admin_user.rol = admin_role
+            session.add(persona)
+            session.flush()
 
-            superuser = (
-                session.query(Usuario)
-                .filter(func.lower(Usuario.username) == SUPERUSER_USERNAME.lower())
-                .first()
+        superuser = (
+            session.query(Usuario)
+            .filter(func.lower(Usuario.username) == SUPERUSER_USERNAME.lower())
+            .first()
+        )
+        if superuser is None:
+            superuser = Usuario(
+                persona=persona,
+                username=SUPERUSER_USERNAME,
+                password_hash=hash_password(SUPERUSER_PASSWORD),
+                estado=EstadoUsuarioEnum.ACTIVO,
             )
-            if superuser is None:
-                persona = (
-                    session.query(Persona)
-                    .filter(
-                        func.lower(Persona.nombres) == SUPERUSER_NAMES.lower(),
-                        func.lower(Persona.apellidos) == SUPERUSER_LASTNAMES.lower(),
-                    )
-                    .first()
-                )
-                if persona is None:
-                    persona = Persona(
-                        nombres=SUPERUSER_NAMES,
-                        apellidos=SUPERUSER_LASTNAMES,
-                        sexo=SexoEnum.MASCULINO,
-                        fecha_nacimiento=SUPERUSER_BIRTHDATE,
-                    )
-                    session.add(persona)
-                    session.flush()
-
-                superuser = Usuario(
-                    persona=persona,
-                    username=SUPERUSER_USERNAME,
-                    password_hash=hash_password(SUPERUSER_PASSWORD),
-                    rol=admin_role,
-                    estado=EstadoUsuarioEnum.ACTIVO,
-                )
-                session.add(superuser)
-            elif superuser.rol_id != admin_role.id:
-                superuser.rol = admin_role
+            session.add(superuser)
+        else:
+            if superuser.persona_id != persona.id:
+                superuser.persona = persona
+            if superuser.estado != EstadoUsuarioEnum.ACTIVO:
+                superuser.estado = EstadoUsuarioEnum.ACTIVO
 
         session.commit()
 

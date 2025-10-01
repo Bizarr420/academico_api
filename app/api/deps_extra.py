@@ -2,92 +2,36 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 
-from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import Session, selectinload
+from fastapi import Depends
 
-from app.api.deps import get_current_user, get_db
-from app.db.models import Rol, Usuario
-
-
-def _load_rol(user: Usuario, db: Session) -> Rol | None:
-    if not getattr(user, "rol_id", None):
-        return None
-    return (
-        db.query(Rol)
-        .options(selectinload(Rol.vistas))
-        .filter(Rol.id == user.rol_id)
-        .first()
-    )
+from app.api.deps import get_current_user
+from app.db.models import Usuario
 
 
-def _normalise(values: Sequence[str] | Iterable[str]) -> set[str]:
-    return {str(value).upper() for value in values}
+def require_view(_code: str):
+    """Temporarily bypass view enforcement while roles are disabled."""
 
-
-def require_view(code: str):
-    required = str(code).upper()
-
-    def dependency(
-        user: Usuario = Depends(get_current_user),
-        db: Session = Depends(get_db),
-    ) -> Usuario:
-        rol = _load_rol(user, db)
-        if rol and any(v.codigo.upper() == required for v in rol.vistas):
-            return user
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permisos insuficientes",
-        )
+    def dependency(user: Usuario = Depends(get_current_user)) -> Usuario:
+        return user
 
     return dependency
 
 
-def require_role(*codes: Iterable[str] | str):
-    if len(codes) == 1 and not isinstance(codes[0], str):
-        allowed = _normalise(codes[0])
-    else:
-        allowed = _normalise(codes)
+def require_role(*_codes: Iterable[str] | str):
+    """Temporarily bypass role enforcement while roles are disabled."""
 
-    def dependency(
-        user: Usuario = Depends(get_current_user),
-        db: Session = Depends(get_db),
-    ) -> Usuario:
-        rol = _load_rol(user, db)
-        codigo = rol.codigo.upper() if rol and rol.codigo else None
-        nombre = rol.nombre.upper() if rol and rol.nombre else None
-        if codigo in allowed or nombre in allowed:
-            return user
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permisos insuficientes",
-        )
+    def dependency(user: Usuario = Depends(get_current_user)) -> Usuario:
+        return user
 
     return dependency
 
 
-def require_role_and_view(roles: Iterable[str], view_code: str):
-    allowed_roles = _normalise(roles)
-    required_view = str(view_code).upper()
+def require_role_and_view(_roles: Iterable[str], _view_code: str):
+    """Temporarily bypass combined role/view enforcement while roles are disabled."""
 
-    def dependency(
-        user: Usuario = Depends(get_current_user),
-        db: Session = Depends(get_db),
-    ) -> Usuario:
-        rol = _load_rol(user, db)
-        codigo = rol.codigo.upper() if rol and rol.codigo else None
-        nombre = rol.nombre.upper() if rol and rol.nombre else None
-        if codigo not in allowed_roles and nombre not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Permisos insuficientes",
-            )
-        if not any(v.codigo.upper() == required_view for v in rol.vistas):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Permisos insuficientes",
-            )
+    def dependency(user: Usuario = Depends(get_current_user)) -> Usuario:
         return user
 
     return dependency
