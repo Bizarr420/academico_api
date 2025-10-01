@@ -78,11 +78,22 @@ def listar_estudiantes(
     codigo_rude: Optional[str] = Query(None, min_length=1),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=500),
 ):
     q = db.query(models.Estudiante)
-    if persona_id: q = q.filter(models.Estudiante.persona_id == persona_id)
-    if codigo_rude: q = q.filter(models.Estudiante.codigo_rude == codigo_rude)
-    return q.offset(offset).limit(limit).all()
+    if persona_id:
+        q = q.filter(models.Estudiante.persona_id == persona_id)
+    if codigo_rude:
+        q = q.filter(models.Estudiante.codigo_rude == codigo_rude)
+
+    effective_limit = page_size if page_size is not None else limit
+    if page is not None:
+        effective_offset = (page - 1) * effective_limit
+    else:
+        effective_offset = offset
+
+    return q.offset(effective_offset).limit(effective_limit).all()
 
 @router.get("/{estudiante_id}", response_model=EstudianteOut)
 def obtener_estudiante(estudiante_id: int, db: Session = Depends(get_db)):
