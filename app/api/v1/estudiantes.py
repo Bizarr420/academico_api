@@ -11,12 +11,16 @@ router = APIRouter(tags=["estudiantes"])
 
 @router.post("/", response_model=EstudianteOut, status_code=201)
 def crear_estudiante(payload: EstudianteCreate, db: Session = Depends(get_db)):
+    codigo_est = payload.codigo_est.strip()
+    if not codigo_est:
+        raise HTTPException(status_code=400, detail="codigo_est es requerido")
+
     if payload.persona is not None:
         try:
             persona = create_persona(db, payload.persona)
             existe = (
                 db.query(models.Estudiante)
-                .filter(models.Estudiante.codigo_est == payload.codigo_est)
+                .filter(models.Estudiante.codigo_est == codigo_est)
                 .first()
             )
             if existe:
@@ -24,7 +28,7 @@ def crear_estudiante(payload: EstudianteCreate, db: Session = Depends(get_db)):
 
             est = models.Estudiante(
                 persona_id=persona.id,
-                codigo_est=payload.codigo_est,
+                codigo_est=codigo_est,
             )
             db.add(est)
             db.commit()
@@ -42,13 +46,13 @@ def crear_estudiante(payload: EstudianteCreate, db: Session = Depends(get_db)):
 
     existe = (
         db.query(models.Estudiante)
-        .filter(models.Estudiante.codigo_est == payload.codigo_est)
+        .filter(models.Estudiante.codigo_est == codigo_est)
         .first()
     )
     if existe:
         raise HTTPException(status_code=400, detail="codigo_est ya existe")
 
-    est = models.Estudiante(persona_id=payload.persona_id, codigo_est=payload.codigo_est)
+    est = models.Estudiante(persona_id=payload.persona_id, codigo_est=codigo_est)
     db.add(est)
     db.commit()
     db.refresh(est)
