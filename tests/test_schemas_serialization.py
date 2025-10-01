@@ -39,6 +39,31 @@ def test_estudiante_out_accepts_orm_objects():
     assert schema.persona.id == persona.id
 
 
+def test_estudiante_out_sets_invalid_anio_ingreso_to_none():
+    persona = models.Persona(
+        id=5,
+        nombres="Luis",
+        apellidos="Soto",
+        sexo=models.SexoEnum.MASCULINO,
+        fecha_nacimiento=date(2002, 4, 10),
+    )
+    estudiante = models.Estudiante(
+        id=9,
+        persona_id=persona.id,
+        codigo_rude="LEGACY001",
+        anio_ingreso=0,
+        situacion=models.SituacionEstudianteEnum.REGULAR.value,
+        estado=models.EstadoEstudianteEnum.ACTIVO.value,
+    )
+    estudiante.persona = persona
+
+    schema = EstudianteOut.model_validate(estudiante)
+
+    assert schema.anio_ingreso is None
+    # The ORM object should remain untouched; we only sanitise the schema output.
+    assert estudiante.anio_ingreso == 0
+
+
 def test_docente_out_accepts_orm_objects():
     persona = models.Persona(
         id=3,
