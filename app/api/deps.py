@@ -15,7 +15,7 @@ from app.db.models import EstadoUsuarioEnum, Usuario
 from app.db.session import SessionLocal
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 @dataclass(slots=True)
@@ -37,10 +37,20 @@ def get_db() -> Iterable[Session]:
 
 def require_auth(
     request: Request,
-    token: str = Depends(oauth2_scheme),
+    token: str | None = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> AuthContext:
-    payload = decode_token(token)
+    raw_token = token or request.cookies.get("access_token")
+    if not raw_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
+
+    if not isinstance(raw_token, str):
+        raw_token = str(raw_token)
+
+    if raw_token.lower().startswith("bearer "):
+        raw_token = raw_token[7:]
+
+    payload = decode_token(raw_token)
     try:
         user_id = int(payload.get("user_id"))
     except (TypeError, ValueError):

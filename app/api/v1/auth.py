@@ -4,14 +4,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session, selectinload
 from pydantic import BaseModel, Field, ValidationError
 
 from app.api.deps import AuthContext, get_db
 from app.api.deps_extra import get_auth_context
 from app.core.permissions import permission_cache
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    create_access_token,
+    hash_password,
+    verify_password,
+)
 from app.db.models import EstadoUsuarioEnum, Usuario
 from app.schemas.usuarios import LoginResponse, SessionInfo, UsuarioOut
 
@@ -44,7 +49,11 @@ async def _parse_login_payload(request: Request) -> LoginRequest:
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request: Request, db: Session = Depends(get_db)) -> LoginResponse:
+async def login(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> LoginResponse:
     credentials = await _parse_login_payload(request)
 
     user = (
@@ -69,6 +78,14 @@ async def login(request: Request, db: Session = Depends(get_db)) -> LoginRespons
             "username": user.username,
             "rol_codigo": user.rol.codigo,
         }
+    )
+
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        httponly=True,
+        samesite="lax",
     )
 
     return LoginResponse(
