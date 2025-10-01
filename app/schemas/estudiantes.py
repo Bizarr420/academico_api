@@ -1,5 +1,4 @@
-from pydantic import BaseModel, Field
-from pydantic import BaseModel, ConfigDict, Field  # 👈 añade esto
+from pydantic import BaseModel, ConfigDict, Field
 
 class EstudianteBase(BaseModel):
     persona_id: int = Field(..., gt=0)
@@ -8,10 +7,7 @@ class EstudianteBase(BaseModel):
 class EstudianteCreate(EstudianteBase):
     pass
 
-class EstudianteOut(BaseModel):
+class EstudianteOut(EstudianteBase):
     id: int
-    persona_id: int
-    codigo_est: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
