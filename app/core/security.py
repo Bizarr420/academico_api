@@ -1,11 +1,15 @@
 # app/core/security.py
 from datetime import datetime, timedelta, timezone
+from typing import Any, Mapping
+
 from fastapi import HTTPException
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 from passlib.context import CryptContext
+
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.JWT_ALGORITHM  # <-- aquí el cambio
@@ -17,10 +21,13 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
-def create_access_token(subject: str, expires_minutes: int | None = None) -> str:
+def create_access_token(
+    claims: Mapping[str, Any], expires_minutes: int | None = None
+) -> str:
     exp_minutes = expires_minutes or ACCESS_TOKEN_EXPIRE_MINUTES
     expire = datetime.now(timezone.utc) + timedelta(minutes=exp_minutes)
-    payload = {"sub": subject, "exp": expire}
+    payload = dict(claims)
+    payload.update({"exp": expire})
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_token(token: str) -> dict:

@@ -1,88 +1,114 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
-from app.api.deps import get_current_user, get_db
-from app.core.security import verify_password, create_access_token, hash_password
-from app.schemas.usuarios import LoginResponse, UsuarioCreate, UsuarioOut
-from app.db.models import Usuario, Persona, EstadoUsuarioEnum
+"""Authentication and session management endpoints."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.orm import Session, selectinload
 from pydantic import BaseModel, Field, ValidationError
-import traceback
-import sys
+
+from app.api.deps import AuthContext, get_db
+from app.api.deps_extra import get_auth_context
+from app.core.permissions import permission_cache
+from app.core.security import create_access_token, hash_password, verify_password
+from app.db.models import EstadoUsuarioEnum, Usuario
+from app.schemas.usuarios import LoginResponse, SessionInfo, UsuarioOut
+
 
 router = APIRouter()
+
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
 
-@router.post("/login", response_model=LoginResponse)
-async def login(request: Request, db: Session = Depends(get_db)):
-    content_type = request.headers.get("content-type", "")
+async def _parse_login_payload(request: Request) -> LoginRequest:
+    """Accept credentials as JSON or form data for backwards compatibility."""
 
+    content_type = request.headers.get("content-type", "")
     if content_type.startswith("application/json"):
         try:
             payload = await request.json()
         except Exception as exc:  # pragma: no cover - body parsing guard
-            raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos") from exc
-        try:
-            credentials = LoginRequest.model_validate(payload)
-        except ValidationError as exc:
-            raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos") from exc
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario o contraseña incorrectos") from exc
     else:
         form = await request.form()
-        username = form.get("username")
-        password = form.get("password")
-        if not username or not password:
-            raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos")
-        credentials = LoginRequest(username=username, password=password)
+        payload = {"username": form.get("username"), "password": form.get("password")}
 
-    u = db.query(Usuario).filter(Usuario.username == credentials.username).first()
-    if not u or not verify_password(credentials.password, u.password_hash):
-        raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos")
-    token = create_access_token(subject=u.username)
-    user_payload = UsuarioOut.model_validate(u, from_attributes=True)
-    return LoginResponse(access_token=token, user=user_payload)
-
-@router.post("/register", response_model=dict)
-def register(data: UsuarioCreate, db: Session = Depends(get_db)):
     try:
-        # username único
-        if db.query(Usuario).filter(Usuario.username == data.username).first():
-            raise HTTPException(status_code=400, detail="Usuario ya existe")
-        # SQLAlchemy 2.0
-        persona = db.get(Persona, data.persona_id)
-        if not persona:
-            raise HTTPException(status_code=404, detail="Persona no encontrada")
+        return LoginRequest.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario o contraseña incorrectos") from exc
 
-        u = Usuario(
-            persona_id=data.persona_id,
-            username=data.username,
-            password_hash=hash_password(data.password),
-            rol_id=data.rol_id,
-            estado=EstadoUsuarioEnum.ACTIVO
-        )
-        db.add(u); db.commit(); db.refresh(u)
-        return {"id": u.id, "username": u.username}
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        print("Error creando evaluación:", e)
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"error interno")
+
+@router.post("/login", response_model=LoginResponse)
+async def login(request: Request, db: Session = Depends(get_db)) -> LoginResponse:
+    credentials = await _parse_login_payload(request)
+
+    user = (
+        db.query(Usuario)
+        .options(selectinload(Usuario.persona), selectinload(Usuario.rol))
+        .filter(Usuario.username == credentials.username)
+        .first()
+    )
+    if not user or not verify_password(credentials.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario o contraseña incorrectos")
+
+    if user.estado != EstadoUsuarioEnum.ACTIVO:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario inactivo")
+
+    if user.rol is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Rol no asignado")
+
+    permissions = permission_cache.get_permissions(db, user.rol_id)
+    token = create_access_token(
+        {
+            "user_id": user.id,
+            "username": user.username,
+            "rol_codigo": user.rol.codigo,
+        }
+    )
+
+    return LoginResponse(
+        access_token=token,
+        user=UsuarioOut.model_validate(user, from_attributes=True),
+        rol_codigo=user.rol.codigo,
+        permisos=sorted(permissions),
+    )
+
+
+@router.get("/me", response_model=SessionInfo)
+def me(context: AuthContext = Depends(get_auth_context)) -> SessionInfo:
+    return SessionInfo(
+        user=UsuarioOut.model_validate(context.user, from_attributes=True),
+        rol_codigo=context.rol_codigo,
+        permisos=sorted(context.permissions),
+    )
+
+
+@router.get("/me/permisos", response_model=list[str])
+def mis_permisos(context: AuthContext = Depends(get_auth_context)) -> list[str]:
+    return sorted(context.permissions)
+
 
 class PasswordChangeIn(BaseModel):
     old_password: str = Field(min_length=6)
     new_password: str = Field(min_length=6)
 
-@router.get("/me", response_model=UsuarioOut)
-def me(current_user: Usuario = Depends(get_current_user)):
-    return UsuarioOut.model_validate(current_user, from_attributes=True)
 
 @router.post("/change-password")
-def change_password(data: PasswordChangeIn, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
-    if not verify_password(data.old_password, current_user.password_hash):
-        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
-    current_user.password_hash = hash_password(data.new_password)
-    db.add(current_user); db.commit()
+def change_password(
+    payload: PasswordChangeIn,
+    db: Session = Depends(get_db),
+    context: AuthContext = Depends(get_auth_context),
+) -> dict[str, Any]:
+    usuario = context.user
+    if not verify_password(payload.old_password, usuario.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario o contraseña incorrectos")
+
+    usuario.password_hash = hash_password(payload.new_password)
+    db.add(usuario)
+    db.commit()
     return {"detail": "Contraseña actualizada"}

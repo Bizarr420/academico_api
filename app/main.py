@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.router import api_router
 from app.core.security import hash_password
-from app.db.models import EstadoUsuarioEnum, Persona, SexoEnum, Usuario
+from app.db.models import EstadoUsuarioEnum, Persona, Rol, SexoEnum, Usuario
 from app.db.session import engine
 
 
@@ -32,6 +32,16 @@ def bootstrap_access_control() -> None:
     """Ensure a default superuser exists while role management is disabled."""
 
     with Session(engine) as session:
+        admin_role = (
+            session.query(Rol)
+            .filter(func.lower(Rol.codigo) == "admin")
+            .first()
+        )
+        if admin_role is None:
+            admin_role = Rol(nombre="Administrador", codigo="ADMIN")
+            session.add(admin_role)
+            session.flush()
+
         persona = (
             session.query(Persona)
             .filter(
@@ -61,6 +71,7 @@ def bootstrap_access_control() -> None:
                 username=SUPERUSER_USERNAME,
                 password_hash=hash_password(SUPERUSER_PASSWORD),
                 estado=EstadoUsuarioEnum.ACTIVO,
+                rol=admin_role,
             )
             session.add(superuser)
         else:
@@ -68,6 +79,8 @@ def bootstrap_access_control() -> None:
                 superuser.persona = persona
             if superuser.estado != EstadoUsuarioEnum.ACTIVO:
                 superuser.estado = EstadoUsuarioEnum.ACTIVO
+            if superuser.rol_id != admin_role.id:
+                superuser.rol = admin_role
 
         session.commit()
 

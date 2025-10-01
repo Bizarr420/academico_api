@@ -4,11 +4,12 @@ from app.db.models import EstadoUsuarioEnum
 from app.schemas.personas import PersonaOut
 from app.schemas.roles import RolOut
 
+
 class UsuarioCreate(BaseModel):
     persona_id: int
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=6)
-    rol_id: int | None = Field(default=None, ge=1)
+    rol_id: int = Field(ge=1)
 
 class Token(BaseModel):
     access_token: str
@@ -18,6 +19,14 @@ class Token(BaseModel):
 class UsuarioUpdate(BaseModel):
     rol_id: int | None = Field(default=None, ge=1)
     estado: EstadoUsuarioEnum | None = None
+
+
+class UsuarioRoleUpdate(BaseModel):
+    rol_id: int = Field(ge=1)
+
+
+class UsuarioPasswordUpdate(BaseModel):
+    password: str = Field(min_length=6)
 
 
 class UsuarioOut(BaseModel):
@@ -33,5 +42,13 @@ class UsuarioOut(BaseModel):
         from_attributes = True
 
 
+class SessionInfo(BaseModel):
+    user: UsuarioOut
+    rol_codigo: str
+    permisos: list[str]
+
+
 class LoginResponse(Token):
     user: UsuarioOut
+    rol_codigo: str
+    permisos: list[str]
