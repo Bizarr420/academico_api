@@ -228,7 +228,7 @@ class Estudiante(Base):
     persona_id: Mapped[int] = mapped_column(
         ForeignKey("personas.id", ondelete="CASCADE"), nullable=False
     )
-    codigo_est: Mapped[str | None] = mapped_column(String(30), unique=True)
+    codigo_est: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
 
     persona: Mapped[Persona] = relationship("Persona")
 

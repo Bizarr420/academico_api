@@ -110,6 +110,20 @@ def mis_permisos(context: AuthContext = Depends(get_auth_context)) -> list[str]:
     return sorted(context.permissions)
 
 
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(response: Response) -> Response:
+    """Invalidate the session cookie for the current client."""
+
+    response.delete_cookie(
+        "access_token",
+        path="/",
+        httponly=True,
+        samesite="lax",
+    )
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
+
+
 class PasswordChangeIn(BaseModel):
     old_password: str = Field(min_length=6)
     new_password: str = Field(min_length=6)
