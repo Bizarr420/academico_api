@@ -1,6 +1,8 @@
+from datetime import date
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
 
 from app.api.deps import get_db
 from app.db import models
@@ -14,6 +16,10 @@ def crear_estudiante(payload: EstudianteCreate, db: Session = Depends(get_db)):
     codigo_est = payload.codigo_est.strip()
     if not codigo_est:
         raise HTTPException(status_code=400, detail="codigo_est es requerido")
+
+    ingreso = payload.anio_ingreso or date.today().year
+    situacion = payload.situacion.value if hasattr(payload.situacion, "value") else payload.situacion
+    estado = payload.estado.value if hasattr(payload.estado, "value") else payload.estado
 
     if payload.persona is not None:
         try:
@@ -29,6 +35,9 @@ def crear_estudiante(payload: EstudianteCreate, db: Session = Depends(get_db)):
             est = models.Estudiante(
                 persona_id=persona.id,
                 codigo_est=codigo_est,
+                anio_ingreso=ingreso,
+                situacion=situacion,
+                estado=estado,
             )
             db.add(est)
             db.commit()
@@ -53,6 +62,9 @@ def crear_estudiante(payload: EstudianteCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="codigo_est ya existe")
 
     est = models.Estudiante(persona_id=payload.persona_id, codigo_est=codigo_est)
+    est.anio_ingreso = ingreso
+    est.situacion = situacion
+    est.estado = estado
     db.add(est)
     db.commit()
     db.refresh(est)

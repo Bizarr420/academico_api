@@ -87,6 +87,9 @@ def test_crear_estudiante_con_persona_id(db_session):
     assert estudiante.persona_id == persona.id
     assert estudiante.persona is not None
     assert estudiante.codigo_est == "EST-001"
+    assert estudiante.anio_ingreso == date.today().year
+    assert estudiante.situacion == models.SituacionEstudianteEnum.REGULAR.value
+    assert estudiante.estado == models.EstadoEstudianteEnum.ACTIVO.value
 
 
 def test_crear_estudiante_con_persona_nueva(db_session):
@@ -97,6 +100,9 @@ def test_crear_estudiante_con_persona_nueva(db_session):
     assert estudiante.persona is not None
     assert estudiante.persona.ci is not None
     assert estudiante.persona.ci.ci_numero == "CI-123"
+    assert estudiante.anio_ingreso == date.today().year
+    assert estudiante.situacion == models.SituacionEstudianteEnum.REGULAR.value
+    assert estudiante.estado == models.EstadoEstudianteEnum.ACTIVO.value
 
 
 def test_crear_estudiante_con_ci_duplicado(db_session):
