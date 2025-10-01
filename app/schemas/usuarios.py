@@ -8,7 +8,7 @@ class UsuarioCreate(BaseModel):
     persona_id: int
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=6)
-    rol_id: int = Field(gt=0)
+    rol_id: int | None = Field(default=None, ge=1)
 
 class Token(BaseModel):
     access_token: str
@@ -16,7 +16,7 @@ class Token(BaseModel):
 
 
 class UsuarioUpdate(BaseModel):
-    rol_id: int = Field(gt=0)
+    rol_id: int | None = Field(default=None, ge=1)
     estado: EstadoUsuarioEnum | None = None
 
 

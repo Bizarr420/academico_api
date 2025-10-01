@@ -26,7 +26,7 @@ def listar_usuarios(
         db.query(Usuario)
         .options(
             selectinload(Usuario.persona),
-            selectinload(Usuario.rol).selectinload(Rol.vistas),
+            selectinload(Usuario.rol),
         )
     )
     if rol_id is not None:
@@ -47,7 +47,7 @@ def obtener_usuario(
         db.query(Usuario)
         .options(
             selectinload(Usuario.persona),
-            selectinload(Usuario.rol).selectinload(Rol.vistas),
+            selectinload(Usuario.rol),
         )
         .filter(Usuario.id == usuario_id)
         .first()
@@ -75,9 +75,10 @@ def crear_usuario(
     if not persona:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Persona no encontrada")
 
-    rol = db.get(Rol, payload.rol_id)
-    if not rol:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rol no encontrado")
+    if payload.rol_id is not None:
+        rol = db.get(Rol, payload.rol_id)
+        if not rol:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rol no encontrado")
 
     usuario = Usuario(
         persona_id=payload.persona_id,
@@ -101,7 +102,7 @@ def crear_usuario(
         db.query(Usuario)
         .options(
             selectinload(Usuario.persona),
-            selectinload(Usuario.rol).selectinload(Rol.vistas),
+            selectinload(Usuario.rol),
         )
         .filter(Usuario.id == usuario.id)
         .first()
@@ -124,9 +125,10 @@ def actualizar_usuario(
     if not usuario:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
 
-    rol = db.get(Rol, payload.rol_id)
-    if not rol:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rol no encontrado")
+    if payload.rol_id is not None:
+        rol = db.get(Rol, payload.rol_id)
+        if not rol:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rol no encontrado")
 
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
@@ -147,7 +149,7 @@ def actualizar_usuario(
         db.query(Usuario)
         .options(
             selectinload(Usuario.persona),
-            selectinload(Usuario.rol).selectinload(Rol.vistas),
+            selectinload(Usuario.rol),
         )
         .filter(Usuario.id == usuario.id)
         .first()
