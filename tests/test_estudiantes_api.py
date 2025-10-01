@@ -79,7 +79,7 @@ def client():
 
 def test_crear_estudiante_con_codigo_valido(client):
     payload = {
-        "codigo_est": "EST-500",
+        "codigo_rude": "RUDE-500",
         "persona": {
             "nombres": "Laura",
             "apellidos": "Mendoza",
@@ -96,15 +96,18 @@ def test_crear_estudiante_con_codigo_valido(client):
 
     assert response.status_code == 201
     body = response.json()
-    assert body["codigo_est"] == "EST-500"
+    assert body["codigo_rude"] == "RUDE-500"
     assert body["persona_id"] > 0
     assert body["persona"]["nombres"] == "Laura"
     assert body["persona"]["sexo"] == models.SexoEnum.FEMENINO.short_code
+    assert body["anio_ingreso"] == date.today().year
+    assert body["situacion"] == "REGULAR"
+    assert body["estado"] == "ACTIVO"
 
 
 def test_crear_estudiante_sin_codigo_retorna_400(client):
     payload = {
-        "codigo_est": "   ",
+        "codigo_rude": "   ",
         "persona": {
             "nombres": "Mario",
             "apellidos": "Gutiérrez",
@@ -116,4 +119,4 @@ def test_crear_estudiante_sin_codigo_retorna_400(client):
     response = client.post("/api/v1/estudiantes/", json=payload)
 
     assert response.status_code == 400
-    assert response.json() == {"detail": "codigo_est es requerido"}
+    assert response.json() == {"detail": "codigo_rude es requerido"}
