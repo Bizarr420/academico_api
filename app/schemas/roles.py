@@ -11,15 +11,17 @@ class VistaOut(BaseModel):
 
 
 class RolBase(BaseModel):
-    nombre: str = Field(min_length=1, max_length=30)
-    codigo: str = Field(min_length=1, max_length=20)
+    nombre: str = Field(min_length=1, max_length=50)
+    codigo: str = Field(min_length=1, max_length=30)
 
 
 class RolCreate(RolBase):
     vista_ids: list[int] = Field(default_factory=list)
 
 
-class RolUpdate(RolBase):
+class RolUpdate(BaseModel):
+    nombre: str | None = Field(default=None, min_length=1, max_length=50)
+    codigo: str | None = Field(default=None, min_length=1, max_length=30)
     vista_ids: list[int] | None = None
 
 
