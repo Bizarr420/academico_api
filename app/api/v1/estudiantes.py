@@ -5,20 +5,54 @@ from typing import List, Optional
 from app.api.deps import get_db
 from app.db import models
 from app.schemas.estudiantes import EstudianteCreate, EstudianteOut
+from app.services.personas import create_persona
 
 router = APIRouter(tags=["estudiantes"])
 
 @router.post("/", response_model=EstudianteOut, status_code=201)
 def crear_estudiante(payload: EstudianteCreate, db: Session = Depends(get_db)):
+    if payload.persona is not None:
+        try:
+            persona = create_persona(db, payload.persona)
+            existe = (
+                db.query(models.Estudiante)
+                .filter(models.Estudiante.codigo_est == payload.codigo_est)
+                .first()
+            )
+            if existe:
+                raise HTTPException(status_code=400, detail="codigo_est ya existe")
+
+            est = models.Estudiante(
+                persona_id=persona.id,
+                codigo_est=payload.codigo_est,
+            )
+            db.add(est)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+        db.refresh(est)
+        db.refresh(est, attribute_names=["persona"])
+        return est
+
     persona = db.get(models.Persona, payload.persona_id)
     if not persona:
         raise HTTPException(status_code=404, detail="Persona no encontrada")
-    existe = db.query(models.Estudiante).filter_by(codigo_est=payload.codigo_est).first()
+
+    existe = (
+        db.query(models.Estudiante)
+        .filter(models.Estudiante.codigo_est == payload.codigo_est)
+        .first()
+    )
     if existe:
         raise HTTPException(status_code=400, detail="codigo_est ya existe")
 
     est = models.Estudiante(persona_id=payload.persona_id, codigo_est=payload.codigo_est)
-    db.add(est); db.commit(); db.refresh(est)
+    db.add(est)
+    db.commit()
+    db.refresh(est)
+    db.refresh(est, attribute_names=["persona"])
     return est
 
 @router.get("/", response_model=List[EstudianteOut])

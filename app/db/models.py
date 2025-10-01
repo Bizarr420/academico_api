@@ -230,6 +230,8 @@ class Estudiante(Base):
     )
     codigo_est: Mapped[str | None] = mapped_column(String(30), unique=True)
 
+    persona: Mapped[Persona] = relationship("Persona")
+
     __table_args__ = (UniqueConstraint("codigo_est", name="uq_est_codigo"),)
 
 
@@ -378,6 +380,8 @@ class Docente(Base):
     )
     titulo: Mapped[str | None] = mapped_column(String(120))
     profesion: Mapped[str | None] = mapped_column(String(120))
+
+    persona: Mapped[Persona] = relationship("Persona")
 
 
 class AsignacionDocente(Base):

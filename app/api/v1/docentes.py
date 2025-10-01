@@ -7,6 +7,7 @@ from app.api.deps import get_db
 from app.api.deps_extra import require_role_and_view, require_view
 from app.db.models import Docente, Persona, Usuario
 from app.schemas.docentes import DocenteCreate, DocenteOut, DocenteUpdate
+from app.services.personas import create_persona
 
 router = APIRouter(tags=["docentes"])
 
@@ -47,18 +48,51 @@ def crear_docente(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_role_and_view({"admin"}, "DOCENTES")),
 ):
+    if payload.persona is not None:
+        try:
+            persona = create_persona(db, payload.persona)
+            existe = db.query(Docente).filter(Docente.persona_id == persona.id).first()
+            if existe:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Docente ya existe para la persona",
+                )
+
+            docente = Docente(
+                persona_id=persona.id,
+                titulo=payload.titulo,
+                profesion=payload.profesion,
+            )
+            db.add(docente)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+        db.refresh(docente)
+        db.refresh(docente, attribute_names=["persona"])
+        return docente
+
     persona = db.get(Persona, payload.persona_id)
     if not persona:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Persona no encontrada")
 
     existe = db.query(Docente).filter(Docente.persona_id == payload.persona_id).first()
     if existe:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Docente ya existe para la persona")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Docente ya existe para la persona",
+        )
 
-    docente = Docente(**payload.model_dump())
+    docente = Docente(
+        persona_id=payload.persona_id,
+        titulo=payload.titulo,
+        profesion=payload.profesion,
+    )
     db.add(docente)
     db.commit()
     db.refresh(docente)
+    db.refresh(docente, attribute_names=["persona"])
     return docente
 
 
