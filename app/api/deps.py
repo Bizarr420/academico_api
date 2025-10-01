@@ -50,16 +50,10 @@ def get_current_user(
 
 
 def require_roles(*roles_validos: str):
-    allowed = {role.upper() for role in roles_validos}
+    """Temporarily bypass role enforcement while roles are disabled."""
 
     def dependency(current_user: Usuario = Depends(get_current_user)) -> Usuario:
-        rol = current_user.rol.nombre.upper() if current_user.rol else None
-        if rol in allowed:
-            return current_user
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permisos insuficientes",
-        )
+        return current_user
 
     return dependency
 
