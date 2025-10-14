@@ -7,6 +7,7 @@ from decimal import Decimal
 from enum import Enum
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     Date,
@@ -18,13 +19,17 @@ from sqlalchemy import (
     Numeric,
     SmallInteger,
     String,
-    Text,
     Table,
+    Text,
     UniqueConstraint,
+    case,
     func,
+    literal,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from .base import Base
 
@@ -38,6 +43,50 @@ class ActivableMixin:
         default="ACTIVO",
         server_default="ACTIVO",
     )
+
+
+class ActivoEstadoMixin:
+    """Mixin that maps ``activo`` tinyint columns to the legacy ``estado`` API."""
+
+    activo: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("1"),
+    )
+    eliminado_en: Mapped[datetime | None] = mapped_column(DateTime)
+
+    @staticmethod
+    def _to_bool(value: str | bool | int | None) -> bool | None:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return bool(value)
+        if isinstance(value, str):
+            normalised = value.strip().upper()
+            if not normalised:
+                return None
+            if normalised in {"ACTIVO", "INACTIVO"}:
+                return normalised == "ACTIVO"
+            if normalised in {"1", "0"}:
+                return normalised == "1"
+        raise ValueError(f"Valor de estado no soportado: {value!r}")
+
+    @hybrid_property
+    def estado(self) -> str:
+        return "ACTIVO" if self.activo else "INACTIVO"
+
+    @estado.expression  # type: ignore[override]
+    def estado(cls):
+        return case((cls.activo.is_(True), literal("ACTIVO")), else_=literal("INACTIVO"))
+
+    @estado.setter
+    def estado(self, value: str | bool | int | None) -> None:
+        resultado = self._to_bool(value)
+        if resultado is not None:
+            self.activo = resultado
 
 
 class EstadoUsuarioEnum(str, Enum):
@@ -355,22 +404,28 @@ class Nota(Base):
     )
 
 
-class Gestion(ActivableMixin, Base):
+class Gestion(ActivoEstadoMixin, Base):
     __tablename__ = "gestion"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nombre: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    nombre: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     fecha_inicio: Mapped[date] = mapped_column(Date, nullable=False)
     fecha_fin: Mapped[date] = mapped_column(Date, nullable=False)
-class Nivel(ActivableMixin, Base):
+
+    __table_args__ = (Index("ix_gestion_activo", "activo"),)
+
+
+class Nivel(ActivoEstadoMixin, Base):
     __tablename__ = "niveles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    nombre: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    nombre: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     etiqueta: Mapped[str] = mapped_column(String(20), nullable=False)
 
+    __table_args__ = (Index("ix_niveles_activo", "activo"),)
 
-class Curso(ActivableMixin, Base):
+
+class Curso(ActivoEstadoMixin, Base):
     __tablename__ = "cursos"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -383,10 +438,11 @@ class Curso(ActivableMixin, Base):
 
     __table_args__ = (
         UniqueConstraint("nivel_id", "nombre", name="uq_cursos_nivel_nombre"),
+        Index("ix_cursos_activo", "activo"),
     )
 
 
-class Paralelo(ActivableMixin, Base):
+class Paralelo(ActivoEstadoMixin, Base):
     __tablename__ = "paralelos"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -399,6 +455,7 @@ class Paralelo(ActivableMixin, Base):
     __table_args__ = (
         UniqueConstraint("curso_id", "etiqueta", name="uq_paralelo"),
         UniqueConstraint("nombre", name="uq_paralelo_nombre"),
+        Index("ix_paralelos_activo", "activo"),
     )
 
 
@@ -423,7 +480,7 @@ class Materia(ActivableMixin, Base):
     )
 
 
-class PlanCursoMateria(ActivableMixin, Base):
+class PlanCursoMateria(ActivoEstadoMixin, Base):
     __tablename__ = "plan_curso_materia"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -435,7 +492,10 @@ class PlanCursoMateria(ActivableMixin, Base):
     )
     horas_sem: Mapped[int | None] = mapped_column(SmallInteger)
 
-    __table_args__ = (UniqueConstraint("curso_id", "materia_id", name="uq_plan"),)
+    __table_args__ = (
+        UniqueConstraint("curso_id", "materia_id", name="uq_plan"),
+        Index("ix_plan_activo", "activo"),
+    )
 
 
 class Docente(ActivableMixin, Base):
@@ -451,7 +511,7 @@ class Docente(ActivableMixin, Base):
     persona: Mapped[Persona] = relationship("Persona")
 
 
-class AsignacionDocente(ActivableMixin, Base):
+class AsignacionDocente(ActivoEstadoMixin, Base):
     __tablename__ = "asignacion_docente"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -480,6 +540,7 @@ class AsignacionDocente(ActivableMixin, Base):
             "paralelo_id",
             name="uq_asig",
         ),
+        Index("ix_asignacion_docente_activo", "activo"),
     )
 
 
