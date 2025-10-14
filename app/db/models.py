@@ -142,7 +142,7 @@ rol_vistas = Table(
 )
 
 
-class Vista(ActivableMixin, Base):
+class Vista(Base):
     __tablename__ = "vistas"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -152,6 +152,20 @@ class Vista(ActivableMixin, Base):
     roles: Mapped[list[Rol]] = relationship(
         "Rol", secondary="rol_vistas", back_populates="vistas"
     )
+
+    @property
+    def estado(self) -> str:
+        """Return a constant estado to keep compatibility with the API schema.
+
+        The legacy schema used by production databases never added the
+        ``estado`` column to the ``vistas`` table.  Earlier versions of this
+        backend nevertheless exposed ``estado`` as part of the response models
+        and callers rely on it.  By providing a read-only property we avoid
+        running migrations on existing deployments while still giving the
+        expected ``ACTIVO`` value to the serializers.
+        """
+
+        return "ACTIVO"
 
 
 class Persona(Base):
