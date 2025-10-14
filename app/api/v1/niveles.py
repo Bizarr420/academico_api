@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -14,17 +14,15 @@ router = APIRouter(tags=["niveles"])
 @router.get("/", response_model=List[NivelOut])
 def listar_niveles(
     db: Session = Depends(get_db),
+    estado: Literal["ACTIVO", "INACTIVO", "TODOS"] = Query("ACTIVO"),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     _: Usuario = Depends(require_view("NIVELES")),
 ):
-    return (
-        db.query(Nivel)
-        .order_by(Nivel.id)
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    query = db.query(Nivel).order_by(Nivel.id)
+    if estado != "TODOS":
+        query = query.filter(Nivel.estado == estado)
+    return query.offset(offset).limit(limit).all()
 
 
 @router.get("/{nivel_id}", response_model=NivelOut)

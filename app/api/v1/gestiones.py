@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -14,14 +14,14 @@ router = APIRouter(tags=["gestiones"])
 @router.get("/", response_model=List[GestionOut])
 def listar_gestiones(
     db: Session = Depends(get_db),
-    solo_activas: bool = Query(False),
+    estado: Literal["ACTIVO", "INACTIVO", "TODOS"] = Query("ACTIVO"),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     _: Usuario = Depends(require_view("GESTIONES")),
 ):
     q = db.query(Gestion).order_by(Gestion.fecha_inicio.desc())
-    if solo_activas:
-        q = q.filter(Gestion.activo == 1)
+    if estado != "TODOS":
+        q = q.filter(Gestion.estado == estado)
     return q.offset(offset).limit(limit).all()
 
 

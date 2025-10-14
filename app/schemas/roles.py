@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -5,6 +7,7 @@ class VistaOut(BaseModel):
     id: int
     nombre: str
     codigo: str
+    estado: Literal["ACTIVO", "INACTIVO"]
 
     class Config:
         from_attributes = True
@@ -13,6 +16,7 @@ class VistaOut(BaseModel):
 class RolBase(BaseModel):
     nombre: str = Field(min_length=1, max_length=50)
     codigo: str = Field(min_length=1, max_length=30)
+    estado: Literal["ACTIVO", "INACTIVO"] = "ACTIVO"
 
 
 class RolCreate(RolBase):
@@ -23,6 +27,7 @@ class RolUpdate(BaseModel):
     nombre: str | None = Field(default=None, min_length=1, max_length=50)
     codigo: str | None = Field(default=None, min_length=1, max_length=30)
     vista_ids: list[int] | None = None
+    estado: Literal["ACTIVO", "INACTIVO"] | None = None
 
 
 class RolOut(RolBase):

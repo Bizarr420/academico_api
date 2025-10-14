@@ -77,6 +77,7 @@ def test_docente_out_accepts_orm_objects():
         persona_id=persona.id,
         titulo="Lic.",
         profesion="Educación",
+        estado="ACTIVO",
     )
     docente.persona = persona
 
