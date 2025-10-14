@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -16,6 +16,7 @@ router = APIRouter(tags=["docentes"])
 def listar_docentes(
     db: Session = Depends(get_db),
     persona_id: int | None = Query(None, ge=1),
+    estado: Literal["ACTIVO", "INACTIVO", "TODOS"] = Query("ACTIVO"),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     _: Usuario = Depends(require_view("DOCENTES")),
@@ -23,6 +24,8 @@ def listar_docentes(
     q = db.query(Docente)
     if persona_id is not None:
         q = q.filter(Docente.persona_id == persona_id)
+    if estado != "TODOS":
+        q = q.filter(Docente.estado == estado)
     return q.order_by(Docente.id).offset(offset).limit(limit).all()
 
 
@@ -62,6 +65,7 @@ def crear_docente(
                 persona_id=persona.id,
                 titulo=payload.titulo,
                 profesion=payload.profesion,
+                estado=payload.estado,
             )
             db.add(docente)
             db.commit()
@@ -88,6 +92,7 @@ def crear_docente(
         persona_id=payload.persona_id,
         titulo=payload.titulo,
         profesion=payload.profesion,
+        estado=payload.estado,
     )
     db.add(docente)
     db.commit()

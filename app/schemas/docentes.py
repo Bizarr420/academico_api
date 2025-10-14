@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.personas import PersonaCreate, PersonaOut
@@ -6,6 +8,7 @@ from app.schemas.personas import PersonaCreate, PersonaOut
 class DocenteBase(BaseModel):
     titulo: str | None = Field(default=None, max_length=120)
     profesion: str | None = Field(default=None, max_length=120)
+    estado: Literal["ACTIVO", "INACTIVO"] = "ACTIVO"
 
 
 class DocenteCreate(DocenteBase):
@@ -24,6 +27,7 @@ class DocenteCreate(DocenteBase):
 class DocenteUpdate(BaseModel):
     titulo: str | None = Field(default=None, max_length=120)
     profesion: str | None = Field(default=None, max_length=120)
+    estado: Literal["ACTIVO", "INACTIVO"] | None = None
 
 
 class DocenteOut(DocenteBase):

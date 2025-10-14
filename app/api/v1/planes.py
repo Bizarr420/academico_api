@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -20,6 +20,7 @@ def listar_planes(
     db: Session = Depends(get_db),
     curso_id: int | None = Query(None, ge=1),
     materia_id: int | None = Query(None, ge=1),
+    estado: Literal["ACTIVO", "INACTIVO", "TODOS"] = Query("ACTIVO"),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     _: Usuario = Depends(require_view("PLANES")),
@@ -29,6 +30,8 @@ def listar_planes(
         q = q.filter(PlanCursoMateria.curso_id == curso_id)
     if materia_id is not None:
         q = q.filter(PlanCursoMateria.materia_id == materia_id)
+    if estado != "TODOS":
+        q = q.filter(PlanCursoMateria.estado == estado)
     return q.order_by(PlanCursoMateria.id).offset(offset).limit(limit).all()
 
 

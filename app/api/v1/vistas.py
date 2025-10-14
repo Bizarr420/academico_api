@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -14,6 +14,10 @@ router = APIRouter(tags=["vistas"])
 @router.get("/", response_model=List[VistaOut])
 def listar_vistas(
     db: Session = Depends(get_db),
+    estado: Literal["ACTIVO", "INACTIVO", "TODOS"] = Query("ACTIVO"),
     _: Usuario = Depends(require_view("VISTAS")),
 ):
-    return db.query(Vista).order_by(Vista.nombre).all()
+    query = db.query(Vista).order_by(Vista.nombre)
+    if estado != "TODOS":
+        query = query.filter(Vista.estado == estado)
+    return query.all()

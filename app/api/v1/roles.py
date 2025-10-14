@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import List
+from typing import List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import text
@@ -24,18 +24,15 @@ router = APIRouter(tags=["roles"])
 @router.get("/", response_model=List[RolOut])
 def listar_roles(
     db: Session = Depends(get_db),
+    estado: Literal["ACTIVO", "INACTIVO", "TODOS"] = Query("ACTIVO"),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     _: AuthContext = Depends(require_permission("ROLES")),
 ) -> List[RolOut]:
-    roles = (
-        db.query(Rol)
-        .options(selectinload(Rol.vistas))
-        .order_by(Rol.id)
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    query = db.query(Rol).options(selectinload(Rol.vistas)).order_by(Rol.id)
+    if estado != "TODOS":
+        query = query.filter(Rol.estado == estado)
+    roles = query.offset(offset).limit(limit).all()
     return roles
 
 
@@ -113,6 +110,10 @@ def crear_rol(
     )
     if not rol:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Rol creado pero no encontrado")
+    if payload.estado != "ACTIVO":
+        rol.estado = payload.estado
+        db.commit()
+        db.refresh(rol)
     return rol
 
 
@@ -137,6 +138,8 @@ def actualizar_rol(
         rol.nombre = payload.nombre
     if payload.codigo is not None:
         rol.codigo = payload.codigo
+    if payload.estado is not None:
+        rol.estado = payload.estado
 
     try:
         db.flush()
