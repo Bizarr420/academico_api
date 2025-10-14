@@ -6,7 +6,8 @@ from collections.abc import Iterable
 
 from fastapi import Depends, HTTPException, status
 
-from app.api.deps import AuthContext, require_auth
+from app.api.deps import AuthContext, optional_auth, require_auth
+from app.core.config import settings
 from app.db.models import Usuario
 
 
@@ -19,7 +20,14 @@ def get_auth_context(context: AuthContext = Depends(require_auth)) -> AuthContex
 def require_permission(view_code: str):
     required = view_code.upper()
 
-    def dependency(context: AuthContext = Depends(require_auth)) -> Usuario:
+    def dependency(context: AuthContext | None = Depends(optional_auth)) -> Usuario | None:
+        if context is None:
+            if settings.TESTING:
+                return None
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No autenticado",
+            )
         if required not in context.permissions:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

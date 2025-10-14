@@ -1,18 +1,24 @@
 from datetime import date
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.api.deps_extra import require_view
 from app.db import models
+from app.db.models import Usuario
 from app.schemas.estudiantes import EstudianteCreate, EstudianteOut
 from app.services.personas import create_persona
 
 router = APIRouter(tags=["estudiantes"])
 
 @router.post("/", response_model=EstudianteOut, status_code=201)
-def crear_estudiante(payload: EstudianteCreate, db: Session = Depends(get_db)):
+def crear_estudiante(
+    payload: EstudianteCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("ESTUDIANTES")),
+):
     codigo_rude = payload.codigo_rude.strip()
     if not codigo_rude:
         raise HTTPException(status_code=400, detail="codigo_rude es requerido")
@@ -80,12 +86,16 @@ def listar_estudiantes(
     offset: int = Query(0, ge=0),
     page: Optional[int] = Query(None, ge=1),
     page_size: Optional[int] = Query(None, ge=1, le=500),
+    estado: Literal["ACTIVO", "INACTIVO", "TODOS"] = Query("ACTIVO"),
+    _: Usuario = Depends(require_view("ESTUDIANTES")),
 ):
     q = db.query(models.Estudiante)
     if persona_id:
         q = q.filter(models.Estudiante.persona_id == persona_id)
     if codigo_rude:
         q = q.filter(models.Estudiante.codigo_rude == codigo_rude)
+    if estado != "TODOS":
+        q = q.filter(models.Estudiante.estado == estado)
 
     effective_limit = page_size if page_size is not None else limit
     if page is not None:
@@ -96,7 +106,11 @@ def listar_estudiantes(
     return q.offset(effective_offset).limit(effective_limit).all()
 
 @router.get("/{estudiante_id}", response_model=EstudianteOut)
-def obtener_estudiante(estudiante_id: int, db: Session = Depends(get_db)):
+def obtener_estudiante(
+    estudiante_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("ESTUDIANTES")),
+):
     est = db.get(models.Estudiante, estudiante_id)
     if not est:
         raise HTTPException(status_code=404, detail="Estudiante no encontrado")

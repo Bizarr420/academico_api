@@ -4,14 +4,19 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.db.models import CIPersona, Persona, SexoEnum
+from app.api.deps_extra import require_view
+from app.db.models import CIPersona, Persona, SexoEnum, Usuario
 from app.schemas.personas import PersonaCreate, PersonaOut
 
 
 router = APIRouter()
 
 @router.post("/", response_model=PersonaOut)
-def crear_persona(data: PersonaCreate, db: Session = Depends(get_db)):
+def crear_persona(
+    data: PersonaCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("PERSONAS")),
+):
     p = Persona(
         nombres=data.nombres,
         apellidos=data.apellidos,
@@ -33,7 +38,11 @@ def crear_persona(data: PersonaCreate, db: Session = Depends(get_db)):
     db.commit(); db.refresh(p)
     return p
 @router.get("/{persona_id}", response_model=PersonaOut)
-def obtener_persona(persona_id: int = Path(..., gt=0), db: Session = Depends(get_db)):
+def obtener_persona(
+    persona_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("PERSONAS")),
+):
     p = db.get(Persona, persona_id)
     if not p:
         raise HTTPException(status_code=404, detail="No encontrado")
@@ -47,7 +56,12 @@ class PersonaUpdate(PersonaCreate):
     fecha_nacimiento: date | None = None
 
 @router.put("/{persona_id}", response_model=PersonaOut)
-def actualizar_persona(persona_id: int, data: PersonaUpdate, db: Session = Depends(get_db)):
+def actualizar_persona(
+    persona_id: int,
+    data: PersonaUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("PERSONAS")),
+):
     p = db.get(Persona, persona_id)
     if not p:
         raise HTTPException(status_code=404, detail="No encontrado")
