@@ -12,6 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.router import api_router
+from app.core.config import settings
 from app.core.security import hash_password
 from app.db.models import EstadoUsuarioEnum, Persona, Rol, SexoEnum, Usuario
 from app.db.session import engine
@@ -95,14 +96,13 @@ app.include_router(api_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/api")
 
 
+cors_allowed_origins = list(dict.fromkeys(settings.CORS_ALLOWED_ORIGINS))
+if settings.FRONTEND_EC2_URL and settings.FRONTEND_EC2_URL not in cors_allowed_origins:
+    cors_allowed_origins.append(settings.FRONTEND_EC2_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=cors_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
