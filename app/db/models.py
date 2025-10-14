@@ -29,6 +29,17 @@ from sqlalchemy.types import TypeDecorator
 from .base import Base
 
 
+class ActivableMixin:
+    """Mixin that provides an ``estado`` column for soft-deletable tables."""
+
+    estado: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        default="ACTIVO",
+        server_default="ACTIVO",
+    )
+
+
 class EstadoUsuarioEnum(str, Enum):
     ACTIVO = "ACTIVO"
     INACTIVO = "INACTIVO"
@@ -109,7 +120,7 @@ class SexoEnumType(TypeDecorator):
             return enum_value
 
 
-class Rol(Base):
+class Rol(ActivableMixin, Base):
     __tablename__ = "roles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -131,7 +142,7 @@ rol_vistas = Table(
 )
 
 
-class Vista(Base):
+class Vista(ActivableMixin, Base):
     __tablename__ = "vistas"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -330,17 +341,14 @@ class Nota(Base):
     )
 
 
-class Gestion(Base):
+class Gestion(ActivableMixin, Base):
     __tablename__ = "gestion"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     fecha_inicio: Mapped[date] = mapped_column(Date, nullable=False)
     fecha_fin: Mapped[date] = mapped_column(Date, nullable=False)
-    activo: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
-
-
-class Nivel(Base):
+class Nivel(ActivableMixin, Base):
     __tablename__ = "niveles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -348,7 +356,7 @@ class Nivel(Base):
     etiqueta: Mapped[str] = mapped_column(String(20), nullable=False)
 
 
-class Curso(Base):
+class Curso(ActivableMixin, Base):
     __tablename__ = "cursos"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -364,7 +372,7 @@ class Curso(Base):
     )
 
 
-class Paralelo(Base):
+class Paralelo(ActivableMixin, Base):
     __tablename__ = "paralelos"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -380,7 +388,7 @@ class Paralelo(Base):
     )
 
 
-class Materia(Base):
+class Materia(ActivableMixin, Base):
     __tablename__ = "materias"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -388,7 +396,6 @@ class Materia(Base):
     codigo: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     descripcion: Mapped[str | None] = mapped_column(Text)
     area: Mapped[str | None] = mapped_column(String(100))
-    estado: Mapped[str] = mapped_column(String(10), nullable=False, server_default="ACTIVO")
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
@@ -402,7 +409,7 @@ class Materia(Base):
     )
 
 
-class PlanCursoMateria(Base):
+class PlanCursoMateria(ActivableMixin, Base):
     __tablename__ = "plan_curso_materia"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -417,7 +424,7 @@ class PlanCursoMateria(Base):
     __table_args__ = (UniqueConstraint("curso_id", "materia_id", name="uq_plan"),)
 
 
-class Docente(Base):
+class Docente(ActivableMixin, Base):
     __tablename__ = "docentes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

@@ -1,10 +1,14 @@
 # app/schemas/paralelos.py
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
+
 
 class ParaleloBase(BaseModel):
     curso_id: int
     nombre: str
     etiqueta: str
+    estado: Literal["ACTIVO", "INACTIVO"] = "ACTIVO"
 
 class ParaleloCreate(ParaleloBase): pass
 

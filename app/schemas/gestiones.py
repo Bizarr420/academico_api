@@ -1,4 +1,6 @@
 from datetime import date
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -6,7 +8,7 @@ class GestionBase(BaseModel):
     nombre: str = Field(min_length=1, max_length=20)
     fecha_inicio: date
     fecha_fin: date
-    activo: int = Field(default=1, ge=0, le=1)
+    estado: Literal["ACTIVO", "INACTIVO"] = "ACTIVO"
 
 
 class GestionCreate(GestionBase):
@@ -17,7 +19,7 @@ class GestionUpdate(BaseModel):
     nombre: str | None = Field(default=None, min_length=1, max_length=20)
     fecha_inicio: date | None = None
     fecha_fin: date | None = None
-    activo: int | None = Field(default=None, ge=0, le=1)
+    estado: Literal["ACTIVO", "INACTIVO"] | None = None
 
 
 class GestionOut(GestionBase):
