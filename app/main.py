@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -35,6 +35,7 @@ def bootstrap_access_control() -> None:
     with Session(engine) as session:
         admin_role = (
             session.query(Rol)
+            .options(load_only(Rol.id, Rol.nombre, Rol.codigo))
             .filter(func.lower(Rol.codigo) == "admin")
             .first()
         )
