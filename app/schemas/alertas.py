@@ -11,6 +11,7 @@ class AlertaBase(BaseModel):
     motivo: str
     score: Optional[conint(ge=0, le=100)] = None
     estado: str = "NUEVO"
+    observacion: str | None = None
 
 class AlertaCreate(AlertaBase): pass
 
@@ -23,9 +24,11 @@ class AlertaOut(BaseModel):
     motivo: str
     score: int | None = None
     estado: Literal["NUEVO","LEIDO","CERRADO"]
+    observacion: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)  # 👈 importante
 
 class AlertaUpdate(BaseModel):
     estado: Literal["NUEVO","LEIDO","CERRADO"] | None = None
+    observacion: str | None = None
