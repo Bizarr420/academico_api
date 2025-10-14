@@ -153,27 +153,64 @@ def listar(
     estudiante_id: int | None = Query(None),
     estado: str | None = Query(None),
     page: int = Query(1, ge=1),
-    size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_view("ALERTAS")),
 ):
     from app.db.models import Alerta, AsignacionDocente as Asg
 
-    q = db.query(Alerta)
+    base_filters = []
     if gestion is not None:
-        q = q.filter(Alerta.gestion == gestion)
+        base_filters.append(Alerta.gestion == gestion)
     if estudiante_id is not None:
-        q = q.filter(Alerta.estudiante_id == estudiante_id)
+        base_filters.append(Alerta.estudiante_id == estudiante_id)
+    estado_norm = None
     if estado:
-        q = q.filter(Alerta.estado == estado)
-    if curso_id is not None:
-        q = q.join(Asg, Alerta.asignacion_id == Asg.id).filter(Asg.curso_id == curso_id)
+        estado_norm = estado.strip().upper()
+        valid_estados = {"NUEVO", "LEIDO", "CERRADO", "TODOS"}
+        if estado_norm not in valid_estados:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "estado inválido")
+        if estado_norm != "TODOS":
+            base_filters.append(Alerta.estado == estado_norm)
 
-    total = q.count()
-    rows = (q.order_by(Alerta.id.desc())
-              .offset((page - 1) * size)
-              .limit(size)
-              .all())
+    join_asignacion = curso_id is not None
+
+    def _apply(query):
+        if join_asignacion:
+            query = query.join(Asg, Alerta.asignacion_id == Asg.id)
+        for condition in base_filters:
+            query = query.filter(condition)
+        if curso_id is not None:
+            query = query.filter(Asg.curso_id == curso_id)
+        return query
+
+    total = _apply(db.query(Alerta)).count()
+
+    estado_counts = {
+        est: int(count)
+        for est, count in (
+            _apply(db.query(Alerta.estado, func.count()))
+            .group_by(Alerta.estado)
+            .all()
+        )
+    }
+
+    tipo_counts = {
+        tipo: int(count)
+        for tipo, count in (
+            _apply(db.query(Alerta.tipo, func.count()))
+            .group_by(Alerta.tipo)
+            .all()
+        )
+    }
+
+    rows = (
+        _apply(db.query(Alerta))
+        .order_by(Alerta.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
 
     items = [{
         "id": r.id,
@@ -184,10 +221,20 @@ def listar(
         "motivo": r.motivo,
         "score": r.score,
         "estado": r.estado,
+        "observacion": getattr(r, "observacion", None),
         "created_at": (r.created_at.isoformat() if getattr(r, "created_at", None) else None),
     } for r in rows]
 
-    return {"items": items, "total": total, "page": page, "size": size}
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "resumen": {
+            "por_estado": estado_counts,
+            "por_tipo": tipo_counts,
+        },
+    }
 
 
 @router.put("/{alerta_id}", response_model=AlertaOut)

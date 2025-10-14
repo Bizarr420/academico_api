@@ -5,7 +5,13 @@ from typing import List
 from app.api.deps import get_db
 from app.api.deps_extra import require_view
 from app.db.models import Nota, Evaluacion, Estudiante, Matricula, Usuario
-from app.schemas.notas import NotaCreate, NotaOut
+from app.schemas.notas import (
+    NotaBulkError,
+    NotaBulkIn,
+    NotaBulkSummary,
+    NotaCreate,
+    NotaOut,
+)
 
 router = APIRouter()
 
@@ -95,11 +101,13 @@ def promedio_ponderado(
     return {"estudiante_id": estudiante_id, "asignacion_id": asignacion_id, "promedio_ponderado": float(sum_prod)/float(sum_pond)}
 
 
-from pydantic import BaseModel, Field, conlist
+from pydantic import BaseModel, Field
 
 
 class NotaUpdate(BaseModel):
     calificacion: float = Field(ge=0, le=100)
+    observacion: str | None = None
+
 
 @router.put("/{nota_id}", response_model=NotaOut)
 def actualizar_nota(
@@ -112,62 +120,125 @@ def actualizar_nota(
     if not n:
         raise HTTPException(status_code=404, detail="Nota no encontrada")
     n.calificacion = body.calificacion
-    db.commit(); db.refresh(n)
+    if body.observacion is not None:
+        n.observacion = body.observacion
+    db.commit()
+    db.refresh(n)
     return n
 
-# app/api/v1/notas.py
-from pydantic import BaseModel, Field, conlist
-class NotaItem(BaseModel):
-    evaluacion_id: int
-    estudiante_id: int
-    calificacion: float
-class NotaMasivaIn(BaseModel):
-    items: list[NotaItem] = Field(min_length=1)
 
-@router.post("/bulk", response_model=List[NotaOut])
+@router.post("/bulk", response_model=NotaBulkSummary)
 def crear_notas_masivo(
-    payload: NotaMasivaIn,
+    payload: NotaBulkIn,
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_view("NOTAS")),
 ):
-    out: list[Nota] = []
+    inserted = 0
+    updated = 0
+    errors: list[NotaBulkError] = []
+    nuevas: list[Nota] = []
 
-    for item in payload.items:
-        # validaciones básicas
-        if not db.get(Evaluacion, item.evaluacion_id):
-            raise HTTPException(404, f"Evaluación {item.evaluacion_id} no encontrada")
+    eval_cache: dict[int, Evaluacion | None] = {}
+    estudiante_cache: dict[int, Estudiante | None] = {}
+    matricula_cache: dict[tuple[int, int], bool] = {}
 
-        if not db.get(Estudiante, item.estudiante_id):
-            raise HTTPException(404, f"Estudiante {item.estudiante_id} no encontrado")
-
-        # chequeo de matrícula (según lo agregaste)
-        eval_ = db.get(Evaluacion, item.evaluacion_id)
-        asig_id = eval_.asignacion_id
-        exists = db.execute(
-            select(Matricula.id).where(
-                Matricula.asignacion_id == asig_id,
-                Matricula.estudiante_id == item.estudiante_id,
+    for idx, item in enumerate(payload.items):
+        evaluacion = eval_cache.get(item.evaluacion_id)
+        if evaluacion is None:
+            evaluacion = db.get(Evaluacion, item.evaluacion_id)
+            eval_cache[item.evaluacion_id] = evaluacion
+        if evaluacion is None:
+            errors.append(
+                NotaBulkError(
+                    index=idx,
+                    evaluacion_id=item.evaluacion_id,
+                    estudiante_id=item.estudiante_id,
+                    error="evaluacion_no_encontrada",
+                    detalle=f"Evaluación {item.evaluacion_id} no encontrada",
+                )
             )
-        ).scalar_one_or_none()
-        if not exists:
-            raise HTTPException(400, f"El estudiante {item.estudiante_id} no está matriculado en la asignación {asig_id}")
+            continue
 
-        # evitar duplicados
-        dup = db.query(Nota).filter(
-            Nota.evaluacion_id == item.evaluacion_id,
-            Nota.estudiante_id == item.estudiante_id
-        ).first()
-        if dup:
-            raise HTTPException(400, f"La nota ya existe para estudiante {item.estudiante_id} en evaluación {item.evaluacion_id}")
+        estudiante = estudiante_cache.get(item.estudiante_id)
+        if estudiante is None:
+            estudiante = db.get(Estudiante, item.estudiante_id)
+            estudiante_cache[item.estudiante_id] = estudiante
+        if estudiante is None:
+            errors.append(
+                NotaBulkError(
+                    index=idx,
+                    evaluacion_id=item.evaluacion_id,
+                    estudiante_id=item.estudiante_id,
+                    error="estudiante_no_encontrado",
+                    detalle=f"Estudiante {item.estudiante_id} no encontrado",
+                )
+            )
+            continue
 
-        out.append(Nota(
-            evaluacion_id=item.evaluacion_id,
-            estudiante_id=item.estudiante_id,
-            calificacion=item.calificacion
-        ))
+        key = (evaluacion.asignacion_id, item.estudiante_id)
+        matriculado = matricula_cache.get(key)
+        if matriculado is None:
+            matriculado = (
+                db.execute(
+                    select(Matricula.id).where(
+                        Matricula.asignacion_id == evaluacion.asignacion_id,
+                        Matricula.estudiante_id == item.estudiante_id,
+                    )
+                ).scalar_one_or_none()
+                is not None
+            )
+            matricula_cache[key] = matriculado
+        if not matriculado:
+            errors.append(
+                NotaBulkError(
+                    index=idx,
+                    evaluacion_id=item.evaluacion_id,
+                    estudiante_id=item.estudiante_id,
+                    error="no_matriculado",
+                    detalle=(
+                        "El estudiante no está matriculado en la asignación "
+                        f"{evaluacion.asignacion_id}"
+                    ),
+                )
+            )
+            continue
 
-    db.add_all(out)
-    db.commit()
-    for n in out:
-        db.refresh(n)
-    return out
+        existente = (
+            db.query(Nota)
+            .filter(
+                Nota.evaluacion_id == item.evaluacion_id,
+                Nota.estudiante_id == item.estudiante_id,
+            )
+            .one_or_none()
+        )
+
+        if existente:
+            existente.calificacion = item.calificacion
+            existente.observacion = item.observacion
+            updated += 1
+            continue
+
+        nuevas.append(
+            Nota(
+                evaluacion_id=item.evaluacion_id,
+                estudiante_id=item.estudiante_id,
+                calificacion=item.calificacion,
+                observacion=item.observacion,
+            )
+        )
+        inserted += 1
+
+    if nuevas:
+        db.add_all(nuevas)
+
+    if inserted or updated:
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        else:
+            for nota in nuevas:
+                db.refresh(nota)
+
+    return NotaBulkSummary(inserted=inserted, updated=updated, errors=errors)

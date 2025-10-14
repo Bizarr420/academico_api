@@ -451,7 +451,7 @@ class Docente(ActivableMixin, Base):
     persona: Mapped[Persona] = relationship("Persona")
 
 
-class AsignacionDocente(Base):
+class AsignacionDocente(ActivableMixin, Base):
     __tablename__ = "asignacion_docente"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -542,6 +542,7 @@ class Alerta(Base):
     motivo: Mapped[str] = mapped_column(String(255), nullable=False)
     score: Mapped[int | None] = mapped_column(Integer)
     estado: Mapped[str] = mapped_column(String(10), nullable=False, server_default="NUEVO")
+    observacion: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

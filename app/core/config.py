@@ -1,5 +1,7 @@
 # app/core/config.py
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
+
 from pydantic import computed_field
 
 class Settings(BaseSettings):
@@ -22,6 +24,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
     FRONTEND_EC2_URL: str | None = None
+
+    @computed_field
+    @property
+    def TESTING(self) -> bool:
+        return os.getenv("PYTEST_CURRENT_TEST") is not None
 
     @computed_field
     @property

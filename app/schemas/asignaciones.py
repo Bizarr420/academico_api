@@ -12,10 +12,11 @@ class AsignacionBase(BaseModel):
 
 
 class AsignacionCreate(AsignacionBase):
-    pass
+    estado: str | None = Field(default="ACTIVO")
 
 
 class AsignacionOut(AsignacionBase):
     id: int
+    estado: str
 
     model_config = ConfigDict(from_attributes=True)

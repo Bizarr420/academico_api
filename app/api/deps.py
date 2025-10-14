@@ -90,6 +90,19 @@ def get_current_user(context: AuthContext = Depends(require_auth)) -> Usuario:
     return context.user
 
 
+def optional_auth(
+    request: Request,
+    token: str | None = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> AuthContext | None:
+    try:
+        return require_auth(request=request, token=token, db=db)
+    except HTTPException as exc:  # pragma: no cover - passthrough for non-401
+        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            return None
+        raise
+
+
 def require_roles(*roles_validos: str):
     allowed = {rol.upper() for rol in roles_validos if rol}
 
