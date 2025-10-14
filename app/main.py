@@ -8,7 +8,7 @@ from typing import Final
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
-from sqlalchemy import func
+from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session, load_only
 
 from app.api.v1.router import api_router
@@ -28,9 +28,52 @@ SUPERUSER_LASTNAMES: Final[str] = "Administrador"
 SUPERUSER_BIRTHDATE: Final[date] = date(1980, 1, 1)
 
 
+def _ensure_roles_estado_column() -> None:
+    """Make sure the ``roles`` table exposes the ``estado`` column.
+
+    Some legacy deployments where migrations were not executed missed the
+    ``estado`` column that newer application versions expect.  Instead of
+    crashing on login (when the relationship is loaded) we opportunistically
+    patch the schema at startup so the application can continue to operate.
+    The logic mirrors the Alembic migration but runs defensively and is safe to
+    execute multiple times.
+    """
+
+    with engine.begin() as connection:
+        inspector = inspect(connection)
+        columns = {column["name"]: column for column in inspector.get_columns("roles")}
+        estado_info = columns.get("estado")
+
+        if estado_info is None:
+            connection.execute(
+                text(
+                    "ALTER TABLE roles ADD COLUMN estado VARCHAR(10)"
+                    " DEFAULT 'ACTIVO'"
+                )
+            )
+            connection.execute(text("UPDATE roles SET estado = 'ACTIVO' WHERE estado IS NULL"))
+            connection.execute(
+                text(
+                    "ALTER TABLE roles MODIFY COLUMN estado VARCHAR(10)"
+                    " NOT NULL DEFAULT 'ACTIVO'"
+                )
+            )
+        else:
+            connection.execute(text("UPDATE roles SET estado = 'ACTIVO' WHERE estado IS NULL"))
+            if estado_info.get("nullable", True):
+                connection.execute(
+                    text(
+                        "ALTER TABLE roles MODIFY COLUMN estado VARCHAR(10)"
+                        " NOT NULL DEFAULT 'ACTIVO'"
+                    )
+                )
+
+
 @app.on_event("startup")
 def bootstrap_access_control() -> None:
     """Ensure a default superuser exists while role management is disabled."""
+
+    _ensure_roles_estado_column()
 
     with Session(engine) as session:
         admin_role = (
