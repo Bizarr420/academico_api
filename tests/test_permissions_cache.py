@@ -43,3 +43,32 @@ def test_permissions_are_normalised_to_uppercase():
         Base.metadata.drop_all(engine)
         engine.dispose()
 
+
+def test_permissions_are_trimmed_before_caching():
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        future=True,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    SessionLocal = sessionmaker(bind=engine, future=True)
+
+    try:
+        with SessionLocal() as session:  # type: Session
+            rol = models.Rol(nombre="Docente", codigo="DOCENTE")
+            vista = models.Vista(nombre="Estudiantes", codigo="  estudiantes  ")
+            session.add_all([rol, vista])
+            session.flush()
+            session.execute(
+                models.rol_vistas.insert().values(rol_id=rol.id, vista_id=vista.id)
+            )
+            session.commit()
+
+            permisos = permission_cache.get_permissions(session, rol.id)
+            assert permisos == {"ESTUDIANTES"}
+    finally:
+        permission_cache.clear()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
