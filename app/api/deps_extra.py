@@ -28,6 +28,11 @@ def require_permission(view_code: str):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="No autenticado",
             )
+        if not settings.ENFORCE_VIEW_PERMISSIONS:
+            # Allow requests when explicit enforcement has been disabled.
+            # This is useful in deployments where role/view assignments are
+            # incomplete and every request was resulting in 403 responses.
+            return context.user
         if required not in context.permissions:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
