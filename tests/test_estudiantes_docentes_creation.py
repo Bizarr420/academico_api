@@ -105,6 +105,65 @@ def test_crear_estudiante_con_persona_nueva(db_session):
     assert estudiante.estado == models.EstadoEstudianteEnum.ACTIVO.value
 
 
+def test_crear_estudiante_rechaza_persona_duplicada(db_session):
+    persona = models.Persona(
+        nombres="Lucía",
+        apellidos="Cáceres",
+        sexo=models.SexoEnum.FEMENINO,
+        fecha_nacimiento=date(2001, 7, 14),
+    )
+    db_session.add(persona)
+    db_session.commit()
+
+    crear_estudiante(
+        EstudianteCreate(persona_id=persona.id, codigo_rude="RUDE-010"),
+        db_session,
+    )
+
+    with pytest.raises(HTTPException) as excinfo:
+        crear_estudiante(
+            EstudianteCreate(persona_id=persona.id, codigo_rude="RUDE-011"),
+            db_session,
+        )
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "La persona ya está registrada como estudiante"
+
+
+def test_crear_estudiante_rechaza_codigo_rude_duplicado(db_session):
+    persona = models.Persona(
+        nombres="Mateo",
+        apellidos="Flores",
+        sexo=models.SexoEnum.MASCULINO,
+        fecha_nacimiento=date(2002, 2, 2),
+    )
+    db_session.add(persona)
+    db_session.commit()
+
+    crear_estudiante(
+        EstudianteCreate(persona_id=persona.id, codigo_rude="RUDE-020"),
+        db_session,
+    )
+
+    otra_persona = models.Persona(
+        nombres="Erika",
+        apellidos="Rojas",
+        sexo=models.SexoEnum.FEMENINO,
+        fecha_nacimiento=date(2003, 9, 9),
+    )
+    db_session.add(otra_persona)
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as excinfo:
+        crear_estudiante(
+            EstudianteCreate(persona_id=otra_persona.id, codigo_rude="RUDE-020"),
+            db_session,
+        )
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "codigo_rude ya existe"
+
+
 def test_crear_estudiante_con_ci_duplicado(db_session):
     crear_estudiante(
         EstudianteCreate(persona=build_persona_payload(ci="CI-777"), codigo_rude="RUDE-100"),
