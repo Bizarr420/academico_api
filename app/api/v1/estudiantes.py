@@ -2,7 +2,8 @@ from datetime import date
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_db
 from app.api.deps_extra import require_view
@@ -24,19 +25,15 @@ def crear_estudiante(
         raise HTTPException(status_code=400, detail="codigo_rude es requerido")
 
     ingreso = payload.anio_ingreso or date.today().year
-    situacion = payload.situacion.value if hasattr(payload.situacion, "value") else payload.situacion
+    situacion = (
+        payload.situacion.value if hasattr(payload.situacion, "value") else payload.situacion
+    )
     estado = payload.estado.value if hasattr(payload.estado, "value") else payload.estado
 
     if payload.persona is not None:
         try:
             persona = create_persona(db, payload.persona)
-            existe = (
-                db.query(models.Estudiante)
-                .filter(models.Estudiante.codigo_rude == codigo_rude)
-                .first()
-            )
-            if existe:
-                raise HTTPException(status_code=400, detail="codigo_rude ya existe")
+            _ensure_codigo_rude_available(db, codigo_rude)
 
             est = models.Estudiante(
                 persona_id=persona.id,
@@ -47,6 +44,9 @@ def crear_estudiante(
             )
             db.add(est)
             db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            raise _translate_integrity_error(exc)
         except Exception:
             db.rollback()
             raise
@@ -59,23 +59,62 @@ def crear_estudiante(
     if not persona:
         raise HTTPException(status_code=404, detail="Persona no encontrada")
 
-    existe = (
-        db.query(models.Estudiante)
-        .filter(models.Estudiante.codigo_rude == codigo_rude)
-        .first()
-    )
-    if existe:
-        raise HTTPException(status_code=400, detail="codigo_rude ya existe")
+    _ensure_codigo_rude_available(db, codigo_rude)
+    _ensure_persona_available(db, payload.persona_id)
 
     est = models.Estudiante(persona_id=payload.persona_id, codigo_rude=codigo_rude)
     est.anio_ingreso = ingreso
     est.situacion = situacion
     est.estado = estado
     db.add(est)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise _translate_integrity_error(exc)
+
     db.refresh(est)
     db.refresh(est, attribute_names=["persona"])
+
     return est
+
+
+def _ensure_codigo_rude_available(db: Session, codigo_rude: str) -> None:
+    existe = (
+        db.query(models.Estudiante.id)
+        .filter(models.Estudiante.codigo_rude == codigo_rude)
+        .first()
+    )
+    if existe:
+        raise HTTPException(status_code=400, detail="codigo_rude ya existe")
+
+
+def _ensure_persona_available(db: Session, persona_id: int | None) -> None:
+    if persona_id is None:
+        return
+    existe = (
+        db.query(models.Estudiante.id)
+        .filter(models.Estudiante.persona_id == persona_id)
+        .first()
+    )
+    if existe:
+        raise HTTPException(
+            status_code=400,
+            detail="La persona ya está registrada como estudiante",
+        )
+
+
+def _translate_integrity_error(exc: IntegrityError) -> HTTPException:
+    raw_message = str(getattr(exc.orig, "args", [exc])[0]).lower()
+    if "uq_estudiantes_persona" in raw_message or "persona" in raw_message and "unique" in raw_message:
+        return HTTPException(
+            status_code=400,
+            detail="La persona ya está registrada como estudiante",
+        )
+    if "uq_estudiantes_rude" in raw_message or "codigo" in raw_message and "rude" in raw_message:
+        return HTTPException(status_code=400, detail="codigo_rude ya existe")
+    return HTTPException(status_code=400, detail="No se pudo registrar al estudiante")
+
 
 @router.get("/", response_model=List[EstudianteOut])
 def listar_estudiantes(
@@ -89,7 +128,7 @@ def listar_estudiantes(
     estado: Literal["ACTIVO", "INACTIVO", "TODOS"] = Query("ACTIVO"),
     _: Usuario = Depends(require_view("ESTUDIANTES")),
 ):
-    q = db.query(models.Estudiante)
+    q = db.query(models.Estudiante).options(selectinload(models.Estudiante.persona))
     if persona_id:
         q = q.filter(models.Estudiante.persona_id == persona_id)
     if codigo_rude:
