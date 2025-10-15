@@ -24,6 +24,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
     FRONTEND_EC2_URL: str | None = None
+    ENFORCE_VIEW_PERMISSIONS: bool = False
 
     @computed_field
     @property
