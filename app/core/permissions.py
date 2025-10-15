@@ -46,7 +46,9 @@ class RolePermissionCache:
         # authenticated users.  By normalising the cached values we make the
         # comparison resilient regardless of how the codes are stored in the
         # database.
-        permissions = frozenset(code.upper() for code in result if code)
+        permissions = frozenset(
+            code.strip().upper() for code in result if code and code.strip()
+        )
         with self._lock:
             self._store[role_id] = permissions
         return permissions
