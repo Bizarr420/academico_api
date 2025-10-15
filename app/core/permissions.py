@@ -35,7 +35,18 @@ class RolePermissionCache:
             .scalars()
             .all()
         )
-        permissions = frozenset(result)
+        # Normalise permission codes to ensure they match the enforcement layer.
+        #
+        # Historically, ``Vista.codigo`` values were stored with varying
+        # capitalisation (``"Estudiantes"``, ``"personas"``, etc.).  The access
+        # control helpers convert the required permission to upper case before
+        # comparing it with the cached set.  If we keep the original casing from
+        # the database the membership check becomes case-sensitive and valid
+        # permissions appear to be missing, producing ``403`` responses for
+        # authenticated users.  By normalising the cached values we make the
+        # comparison resilient regardless of how the codes are stored in the
+        # database.
+        permissions = frozenset(code.upper() for code in result if code)
         with self._lock:
             self._store[role_id] = permissions
         return permissions
