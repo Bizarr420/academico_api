@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Application entry-point for Académico API."""
 
-from __future__ import annotations
 
 from datetime import date
 from typing import Final
@@ -19,6 +20,15 @@ from app.db.session import engine
 
 
 app = FastAPI(title="Académico API")
+
+# Configuración centralizada de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 SUPERUSER_USERNAME: Final[str] = "root"
@@ -107,6 +117,7 @@ def bootstrap_access_control() -> None:
 
         superuser = (
             session.query(Usuario)
+
             .filter(func.lower(Usuario.username) == SUPERUSER_USERNAME.lower())
             .first()
         )
@@ -136,21 +147,7 @@ def bootstrap_access_control() -> None:
 # ``/auth/login`` sin el prefijo de versión.  Para mantener compatibilidad con
 # el frontend sin romper los clientes que ya usan ``/api/v1`` incluimos el
 # router dos veces, otorgando un alias sin versión.
-#app.include_router(api_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/api")
-
-
-cors_allowed_origins = list(dict.fromkeys(settings.CORS_ALLOWED_ORIGINS))
-if settings.FRONTEND_EC2_URL and settings.FRONTEND_EC2_URL not in cors_allowed_origins:
-    cors_allowed_origins.append(settings.FRONTEND_EC2_URL)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 @app.on_event("startup")

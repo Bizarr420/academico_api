@@ -1,9 +1,22 @@
-from datetime import date
 
+from datetime import date
 from pydantic import BaseModel, Field, field_serializer
 from pydantic.config import ConfigDict
-
 from app.db.models import SexoEnum
+
+
+# ...existing code...
+
+class PersonaUpdate(BaseModel):
+    nombres: str | None = None
+    apellidos: str | None = None
+    sexo: SexoEnum | None = None
+    fecha_nacimiento: date | None = None
+    celular: str | None = None
+    direccion: str | None = None
+    ci_numero: str | None = None
+    ci_complemento: str | None = None
+    ci_expedicion: str | None = None
 
 class PersonaBase(BaseModel):
     nombres: str = Field(min_length=1, max_length=120)

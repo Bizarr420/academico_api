@@ -50,6 +50,23 @@ class EstudianteOut(EstudianteBase):
     persona_id: int
     persona: PersonaOut | None = None
 
+
+# Para edición completa (PUT)
+class EstudianteUpdate(BaseModel):
+    codigo_rude: str | None = Field(default=None, min_length=1, max_length=30)
+    anio_ingreso: int | None = Field(
+        default=None,
+        ge=1900,
+        le=date.today().year + 1,
+        description="Año de ingreso al establecimiento",
+    )
+    situacion: SituacionEstudianteEnum | None = None
+    estado: EstadoEstudianteEnum | None = None
+
+# Para cambio de estado (PATCH)
+class EstudianteEstadoPatch(BaseModel):
+    estado: EstadoEstudianteEnum
+
     @model_validator(mode="before")
     @classmethod
     def _normalise_anio_ingreso(cls, data: "EstudianteOut" | dict) -> "EstudianteOut" | dict:

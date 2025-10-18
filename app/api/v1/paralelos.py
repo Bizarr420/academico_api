@@ -6,8 +6,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.api.deps_extra import require_view
 from app.db.models import Paralelo, Usuario
+from app.schemas.paralelos import ParaleloCreate
+
 
 router = APIRouter()
+
 
 @router.get("/")
 def listar_paralelos(
@@ -20,18 +23,15 @@ def listar_paralelos(
         query = query.filter(Paralelo.estado == estado)
     return query.all()
 
+
 @router.post("/")
 def crear_paralelo(
-    data: dict,
+    data: ParaleloCreate,
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_view("PARALELOS")),
 ):
-    estado = data.get("estado")
-    if estado is not None:
-        estado_norm = str(estado).strip().upper()
-        if estado_norm not in {"ACTIVO", "INACTIVO"}:
-            raise HTTPException(status_code=400, detail="estado inválido")
-        data["estado"] = estado_norm
-    p = Paralelo(**data)
-    db.add(p); db.commit(); db.refresh(p)
+    p = Paralelo(**data.model_dump())
+    db.add(p)
+    db.commit()
+    db.refresh(p)
     return p

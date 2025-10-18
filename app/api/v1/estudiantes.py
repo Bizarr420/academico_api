@@ -9,7 +9,7 @@ from app.api.deps import get_db
 from app.api.deps_extra import require_view
 from app.db import models
 from app.db.models import Usuario
-from app.schemas.estudiantes import EstudianteCreate, EstudianteOut
+from app.schemas.estudiantes import EstudianteCreate, EstudianteOut, EstudianteUpdate, EstudianteEstadoPatch
 from app.services.personas import create_persona
 
 router = APIRouter(tags=["estudiantes"])
@@ -129,10 +129,23 @@ def listar_estudiantes(
     _: Usuario = Depends(require_view("ESTUDIANTES")),
 ):
     q = db.query(models.Estudiante).options(selectinload(models.Estudiante.persona))
+
     if persona_id:
         q = q.filter(models.Estudiante.persona_id == persona_id)
+
+    # Búsqueda parcial por código RUDE
     if codigo_rude:
-        q = q.filter(models.Estudiante.codigo_rude == codigo_rude)
+        q = q.filter(models.Estudiante.codigo_rude.ilike(f"%{codigo_rude}%"))
+
+    # Búsqueda por nombre o apellido de persona
+    if search := locals().get('search'):
+        search = search.strip()
+        if search:
+            q = q.join(models.Persona).filter(
+                (models.Persona.nombres.ilike(f"%{search}%")) |
+                (models.Persona.apellidos.ilike(f"%{search}%"))
+            )
+
     if estado != "TODOS":
         q = q.filter(models.Estudiante.estado == estado)
 
@@ -142,7 +155,59 @@ def listar_estudiantes(
     else:
         effective_offset = offset
 
-    return q.offset(effective_offset).limit(effective_limit).all()
+    estudiantes = q.offset(effective_offset).limit(effective_limit).all()
+    # Filtrar registros con anio_ingreso inválido para evitar errores de validación
+    estudiantes_filtrados = [e for e in estudiantes if e.anio_ingreso is None or e.anio_ingreso >= 1900]
+    return estudiantes_filtrados
+
+
+# Endpoint para edición completa
+@router.put("/{estudiante_id}", response_model=EstudianteOut)
+def actualizar_estudiante(
+    estudiante_id: int,
+    payload: EstudianteUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("ESTUDIANTES")),
+):
+    est = db.get(models.Estudiante, estudiante_id)
+    if not est:
+        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        if value is not None:
+            setattr(est, field, value)
+    db.add(est)
+    db.commit()
+    db.refresh(est)
+    db.refresh(est, attribute_names=["persona"])
+    return est
+
+
+# Endpoint para cambio de estado
+@router.patch("/{estudiante_id}/estado", response_model=EstudianteOut)
+def cambiar_estado_estudiante(
+    estudiante_id: int,
+    payload: EstudianteEstadoPatch,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_view("ESTUDIANTES")),
+):
+    est = db.get(models.Estudiante, estudiante_id)
+    if not est:
+        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
+    nuevo_estado = payload.estado.value if hasattr(payload.estado, "value") else payload.estado
+    est.estado = nuevo_estado
+    if nuevo_estado == "INACTIVO":
+        est.activo = False
+        from datetime import datetime
+        est.eliminado_en = datetime.utcnow()
+    else:
+        est.activo = True
+        est.eliminado_en = None
+    db.add(est)
+    db.commit()
+    db.refresh(est)
+    db.refresh(est, attribute_names=["persona"])
+    return est
 
 @router.get("/{estudiante_id}", response_model=EstudianteOut)
 def obtener_estudiante(

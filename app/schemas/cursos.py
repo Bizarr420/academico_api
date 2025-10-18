@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict
 class CursoBase(BaseModel):
     nivel_id: int
     nombre: str
-    etiqueta: str
     estado: Literal["ACTIVO", "INACTIVO"] = "ACTIVO"
 
 class CursoCreate(CursoBase): pass

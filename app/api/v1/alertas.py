@@ -1,3 +1,12 @@
+def error_response(code: str, message: str, details: str | None = None, status_code: int = 400):
+    return HTTPException(
+        status_code=status_code,
+        detail={
+            "code": code,
+            "message": message,
+            "details": details,
+        },
+    )
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, cast, Float
@@ -15,7 +24,12 @@ def _get_asignacion_model():
     from app.db import models as m
     Asg = getattr(m, "AsignacionDocente", None)
     if Asg is None:
-        raise HTTPException(500, "No se encontró modelo AsignacionDocente.")
+        raise error_response(
+            code="MODEL_NOT_FOUND",
+            message="No se encontró modelo AsignacionDocente.",
+            details=None,
+            status_code=500
+        )
     return Asg
 
 def _get_models_for_promedio():
@@ -23,29 +37,64 @@ def _get_models_for_promedio():
     Nota = getattr(m, "Nota", None)
     Evaluacion = getattr(m, "Evaluacion", None)
     if Nota is None or Evaluacion is None:
-        raise HTTPException(500, "Faltan modelos Nota/Evaluacion.")
+        raise error_response(
+            code="MODEL_NOT_FOUND",
+            message="Faltan modelos Nota/Evaluacion.",
+            details=None,
+            status_code=500
+        )
     col = getattr(Nota, "calificacion", None)
     if col is None:
-        raise HTTPException(500, "Nota.calificacion no existe.")
+        raise error_response(
+            code="FIELD_NOT_FOUND",
+            message="Nota.calificacion no existe.",
+            details=None,
+            status_code=500
+        )
     if not hasattr(Nota, "evaluacion_id"):
-        raise HTTPException(500, "Nota.evaluacion_id no existe.")
+        raise error_response(
+            code="FIELD_NOT_FOUND",
+            message="Nota.evaluacion_id no existe.",
+            details=None,
+            status_code=500
+        )
     if not hasattr(Evaluacion, "asignacion_id"):
-        raise HTTPException(500, "Evaluacion.asignacion_id no existe.")
+        raise error_response(
+            code="FIELD_NOT_FOUND",
+            message="Evaluacion.asignacion_id no existe.",
+            details=None,
+            status_code=500
+        )
     return Nota, Evaluacion, col
 
 def _asistencia_bits(dias: int):
     # fecha DATE
     fecha_col = getattr(Asistencia, "fecha", None)
     if fecha_col is None:
-        raise HTTPException(500, "Asistencia.fecha no existe.")
+        raise error_response(
+            code="FIELD_NOT_FOUND",
+            message="Asistencia.fecha no existe.",
+            details=None,
+            status_code=500
+        )
     # ausente por enum
     if not hasattr(Asistencia, "estado"):
-        raise HTTPException(500, "Asistencia.estado no existe.")
+        raise error_response(
+            code="FIELD_NOT_FOUND",
+            message="Asistencia.estado no existe.",
+            details=None,
+            status_code=500
+        )
     ausente_filter = Asistencia.estado.in_(["AUSENTE", "A"])  # ajustable si usas otros códigos
     # fk a asignación
     asig_col = getattr(Asistencia, "asignacion_id", None)
     if asig_col is None:
-        raise HTTPException(500, "Asistencia.asignacion_id no existe.")
+        raise error_response(
+            code="FIELD_NOT_FOUND",
+            message="Asistencia.asignacion_id no existe.",
+            details=None,
+            status_code=500
+        )
     # ventana (DATE con DATE)
     desde = date.today() - timedelta(days=dias)
     return fecha_col, desde, ausente_filter, asig_col

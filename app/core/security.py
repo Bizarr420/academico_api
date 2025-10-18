@@ -16,10 +16,12 @@ ALGORITHM = settings.JWT_ALGORITHM  # <-- aquí el cambio
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # bcrypt solo soporta hasta 72 bytes
+    return pwd_context.hash(password[:72])
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    # bcrypt solo soporta hasta 72 bytes
+    return pwd_context.verify(plain[:72], hashed)
 
 def create_access_token(
     claims: Mapping[str, Any], expires_minutes: int | None = None

@@ -28,6 +28,23 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+def authenticate_user(db: Session, username: str, password: str):
+    user = (
+        db.query(Usuario)
+        .options(selectinload(Usuario.persona), selectinload(Usuario.rol))
+        .filter(Usuario.username == username)
+        .first()
+    )
+    if not user or not verify_password(password, user.password_hash):
+        return None
+    if user.estado != EstadoUsuarioEnum.ACTIVO:
+        return None
+    if user.rol is None:
+        return None
+    return user
+    username: str
+    password: str
+
 
 async def _parse_login_payload(request: Request) -> LoginRequest:
     """Accept credentials as JSON or form data for backwards compatibility."""

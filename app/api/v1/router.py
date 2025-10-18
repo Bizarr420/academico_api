@@ -3,13 +3,14 @@ from fastapi import APIRouter
 # IMPORTA EXPLÍCITAMENTE el router de materias con alias
 from .materias import router as materias_router
 
+
+from .cursos import router as cursos_router
 from . import (
     alertas,
     asistencia,
     asignaciones,
     auth,
     docentes,
-    cursos,
     evaluaciones,
     estudiantes,
     gestiones,
@@ -27,12 +28,16 @@ from . import (
 )
 
 api_router = APIRouter()
-api_router.include_router(auth.router,         prefix="/auth",         tags=["auth"])
+from . import auth_router
+# ... existing code ...
+api_router.include_router(auth_router.router, prefix="/auth", tags=["auth"])
+# ... existing code ...
+
 api_router.include_router(personas.router,     prefix="/personas",     tags=["personas"])
 api_router.include_router(estudiantes.router,  prefix="/estudiantes",  tags=["estudiantes"])
 api_router.include_router(notas.router,        prefix="/notas",        tags=["notas"])
 api_router.include_router(evaluaciones.router, prefix="/evaluaciones", tags=["evaluaciones"])
-api_router.include_router(cursos.router,       prefix="/cursos",       tags=["cursos"])
+api_router.include_router(cursos_router,       prefix="/cursos",       tags=["cursos"])
 api_router.include_router(paralelos.router,    prefix="/paralelos",    tags=["paralelos"])
 api_router.include_router(niveles.router,      prefix="/niveles",      tags=["niveles"])
 api_router.include_router(gestiones.router,    prefix="/gestiones",    tags=["gestiones"])

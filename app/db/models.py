@@ -433,8 +433,9 @@ class Curso(ActivoEstadoMixin, Base):
         ForeignKey("niveles.id", ondelete="CASCADE"), nullable=False
     )
     nombre: Mapped[str] = mapped_column(String(60), nullable=False)
-    etiqueta: Mapped[str] = mapped_column(String(20), nullable=False)
-    grado: Mapped[int | None] = mapped_column(SmallInteger)
+    # etiqueta y grado eliminados
+    paralelos: Mapped[list["Paralelo"]] = relationship("Paralelo", back_populates="curso")
+    nivel: Mapped["Nivel"] = relationship("Nivel")
 
     __table_args__ = (
         UniqueConstraint("nivel_id", "nombre", name="uq_cursos_nivel_nombre"),
@@ -449,11 +450,9 @@ class Paralelo(ActivoEstadoMixin, Base):
     curso_id: Mapped[int] = mapped_column(
         ForeignKey("cursos.id", ondelete="CASCADE"), nullable=False
     )
-    etiqueta: Mapped[str] = mapped_column(String(10), nullable=False)
     nombre: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
-
+    curso: Mapped["Curso"] = relationship("Curso", back_populates="paralelos")
     __table_args__ = (
-        UniqueConstraint("curso_id", "etiqueta", name="uq_paralelo"),
         UniqueConstraint("nombre", name="uq_paralelo_nombre"),
         Index("ix_paralelos_activo", "activo"),
     )

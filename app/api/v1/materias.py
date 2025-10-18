@@ -1,3 +1,12 @@
+def error_response(code: str, message: str, details: str | None = None, status_code: int = 400):
+    return HTTPException(
+        status_code=status_code,
+        detail={
+            "code": code,
+            "message": message,
+            "details": details,
+        },
+    )
 # app/api/v1/materias.py
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -93,12 +102,21 @@ def crear_materia(
     except IntegrityError as e:
         db.rollback()
         # si igualmente se coló una violación única u otra constraint
-        raise HTTPException(status_code=400, detail="violación de integridad (¿código duplicado o columna obligatoria?)")
+        raise error_response(
+            code="INTEGRITY_ERROR",
+            message="Violación de integridad (¿código duplicado o columna obligatoria?)",
+            details=None,
+            status_code=400
+        )
 
     except Exception as e:
         db.rollback()
-        # 👇 para depurar rápido mientras desarrollas:
-        raise HTTPException(status_code=400, detail=f"error al crear materia: {str(e)}")
+        raise error_response(
+            code="CREATE_ERROR",
+            message="Error al crear materia",
+            details=str(e),
+            status_code=400
+        )
 
 @router.put("/{materia_id}", response_model=MateriaOut)
 def editar_materia(

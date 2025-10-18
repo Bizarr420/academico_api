@@ -1,3 +1,34 @@
+def get_docente_with_relations(docente, db):
+    from app.db.models import AsignacionDocente, Materia, Curso, Paralelo
+    from app.schemas.docentes import AsignacionDocenteOut, ParaleloOut
+    from app.schemas.materias import MateriaOut
+    from app.schemas.cursos import CursoOut
+
+    asignaciones = db.query(AsignacionDocente).filter(AsignacionDocente.docente_id == docente.id).all()
+    materia_ids = list({a.materia_id for a in asignaciones})
+    curso_ids = list({a.curso_id for a in asignaciones})
+    materias = db.query(Materia).filter(Materia.id.in_(materia_ids)).all() if materia_ids else []
+    cursos = db.query(Curso).filter(Curso.id.in_(curso_ids)).all() if curso_ids else []
+    docente.materias = materias
+    docente.cursos = cursos
+
+    asignaciones_out = []
+    for asignacion in asignaciones:
+        materia = next((m for m in materias if m.id == asignacion.materia_id), None)
+        curso = next((c for c in cursos if c.id == asignacion.curso_id), None)
+        paralelo = db.query(Paralelo).filter(Paralelo.id == asignacion.paralelo_id).first()
+        if materia and curso and paralelo:
+            asignaciones_out.append(
+                AsignacionDocenteOut(
+                    id=asignacion.id,
+                    gestion_id=asignacion.gestion_id,
+                    materia=MateriaOut.model_validate(materia),
+                    curso=CursoOut.model_validate(curso),
+                    paralelo=ParaleloOut.model_validate(paralelo)
+                )
+            )
+    docente.asignaciones = asignaciones_out
+    return docente
 from typing import List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,12 +52,16 @@ def listar_docentes(
     offset: int = Query(0, ge=0),
     _: Usuario = Depends(require_view("DOCENTES")),
 ):
+    from app.db.models import AsignacionDocente, Materia, Curso
+
     q = db.query(Docente)
     if persona_id is not None:
         q = q.filter(Docente.persona_id == persona_id)
     if estado != "TODOS":
         q = q.filter(Docente.estado == estado)
-    return q.order_by(Docente.id).offset(offset).limit(limit).all()
+    docentes = q.order_by(Docente.id).offset(offset).limit(limit).all()
+    result = [get_docente_with_relations(docente, db) for docente in docentes]
+    return result
 
 
 @router.get("/{docente_id}", response_model=DocenteOut)
@@ -61,6 +96,7 @@ def crear_docente(
                     detail="Docente ya existe para la persona",
                 )
 
+
             docente = Docente(
                 persona_id=persona.id,
                 titulo=payload.titulo,
@@ -69,13 +105,34 @@ def crear_docente(
             )
             db.add(docente)
             db.commit()
+            db.refresh(docente)
+
+            # Asignar materia y cursos si se reciben
+            if payload.materia_id:
+                from app.db.models import AsignacionDocente, Paralelo
+                gestion_id = db.execute("SELECT id FROM gestion ORDER BY id DESC LIMIT 1").scalar()  # Ajusta según tu lógica de gestión
+                if payload.curso_ids:
+                    for curso_id in payload.curso_ids:
+                        paralelo = db.query(Paralelo).filter(Paralelo.curso_id == curso_id).first()
+                        if not paralelo:
+                            continue  # O puedes lanzar un error si es obligatorio
+                        asignacion = AsignacionDocente(
+                            gestion_id=gestion_id,
+                            docente_id=docente.id,
+                            materia_id=payload.materia_id,
+                            curso_id=curso_id,
+                            paralelo_id=paralelo.id
+                        )
+                        db.add(asignacion)
+                db.commit()
+
         except Exception:
             db.rollback()
             raise
 
-        db.refresh(docente)
-        db.refresh(docente, attribute_names=["persona"])
-        return docente
+    db.refresh(docente)
+    db.refresh(docente, attribute_names=["persona"])
+    return get_docente_with_relations(docente, db)
 
     persona = db.get(Persona, payload.persona_id)
     if not persona:
@@ -96,9 +153,32 @@ def crear_docente(
     )
     db.add(docente)
     db.commit()
+
+    # Asignar materia y cursos si se reciben
+    if payload.materia_id:
+        from app.db.models import AsignacionDocente, Paralelo
+        gestion_id = db.execute("SELECT id FROM gestion ORDER BY id DESC LIMIT 1").scalar()  # Ajusta según tu lógica de gestión
+        if payload.curso_ids:
+            for curso_id in payload.curso_ids:
+                paralelo = db.query(Paralelo).filter(Paralelo.curso_id == curso_id).first()
+                if not paralelo:
+                    continue  # O puedes lanzar un error si es obligatorio
+                asignacion = AsignacionDocente(
+                    gestion_id=gestion_id,
+                    docente_id=docente.id,
+                    materia_id=payload.materia_id,
+                    curso_id=curso_id,
+                    paralelo_id=paralelo.id
+                )
+                db.add(asignacion)
+        else:
+            # Si no hay cursos, no se puede asignar paralelo
+            pass
+        db.commit()
+
     db.refresh(docente)
     db.refresh(docente, attribute_names=["persona"])
-    return docente
+    return get_docente_with_relations(docente, db)
 
 
 @router.patch(

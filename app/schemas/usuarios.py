@@ -1,24 +1,36 @@
 from pydantic import BaseModel, Field
 
 from app.db.models import EstadoUsuarioEnum
-from app.schemas.personas import PersonaOut
+from app.schemas.personas import PersonaOut, PersonaCreate
 from app.schemas.roles import RolOut
 
 
 class UsuarioCreate(BaseModel):
-    persona_id: int
+    persona_id: int | None = None
+    persona: PersonaCreate | None = None
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=6)
     rol_id: int = Field(ge=1)
+
+    class Config:
+        arbitrary_types_allowed = True
 
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
 
+from app.schemas.personas import PersonaUpdate
+
 class UsuarioUpdate(BaseModel):
+    username: str | None = Field(default=None, min_length=3, max_length=50)
     rol_id: int | None = Field(default=None, ge=1)
     estado: EstadoUsuarioEnum | None = None
+    persona: PersonaUpdate | None = None
+    password: str | None = Field(default=None, min_length=6)
+
+    class Config:
+        from_attributes = True
 
 
 class UsuarioRoleUpdate(BaseModel):
